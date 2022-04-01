@@ -1,34 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using Newtonsoft.Json;
+using NLog;
 using Formatting = System.Xml.Formatting;
 
 namespace Utility.Helper
 {
     public class ApiHelper: IApiHelper
     {
-        /// <summary>
-        /// Email
-        /// </summary>
-        private string Email = ConfigHelper.GetInstance().GetAppSettingValue("Email");
-
-        /// <summary>
-        /// Secret Text
-        /// </summary>
-        private string SecretText = ConfigHelper.GetInstance().GetAppSettingValue("Pw");
-
-        /// <summary>
-        /// loginURL
-        /// </summary>
-        private string loginURL = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
-        
-        
-
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private string _sessionId;
+        private string _jsessionId;
+        private CookieContainer cookieContainer;
+        public string SessionId
+        {
+            get { return _sessionId; }
+        }
+        public string JSessionId
+        {
+            get { return _jsessionId; }
+        }
         /// <summary>
         /// Get request for API
         /// </summary>
@@ -45,7 +43,7 @@ namespace Utility.Helper
 
                 var httpResponseMessage = await client.GetAsync(requestEndpoint);
                 var response = await httpResponseMessage.Content.ReadAsStringAsync();
-
+                logger.Info(response);
                 return JsonConvert.DeserializeObject<T>(response, new JsonSerializerSettings());
             }
         }
@@ -82,8 +80,10 @@ namespace Utility.Helper
                 var httpContent = new StringContent(json);
 
                 var httpResponseMessage = await client.PostAsync(requestEndpoint, httpContent);
+                //_jsessionId = GetCookieValue(httpResponseMessage, "JSESSIONID");
+                //_sessionId = GetCookieValue(httpResponseMessage, "sessionId");
                 var response = await httpResponseMessage.Content.ReadAsStringAsync();
-
+                logger.Info(response);
                 return JsonConvert.DeserializeObject<TResponseType>(response);
             }
         }
@@ -101,6 +101,27 @@ namespace Utility.Helper
             return await this.PostRequestAsync<TRequestType, TResponseType>(requestEndpoint, requestBody, null);
         }
 
+        public void PostRequest<TRequestType>(string requestEndpoint, TRequestType requestBody,
+            Dictionary<string, string> additionalHeaders)
+        {
+            var handler = new HttpClientHandler();
+            using (var client = new HttpClient(handler))
+            {
+
+                // Add additional headers
+                AddHeaders(client, additionalHeaders);
+                
+                var json = JsonConvert.SerializeObject(requestBody);
+                var httpContent = new StringContent(json);
+                
+                var httpResponseMessage = client.PostAsync(requestEndpoint, httpContent).GetAwaiter().GetResult();
+                cookieContainer = handler.CookieContainer;
+                //_jsessionId = GetCookieValue(httpResponseMessage, "JSESSIONID");
+               //_sessionId = GetCookieValue(httpResponseMessage, "sessionId");
+                var response = httpResponseMessage.Content.ToString();
+                logger.Info(response);
+            }
+        }
         /// <summary>
         /// Put request for API
         /// </summary>
@@ -188,6 +209,17 @@ namespace Utility.Helper
                 httpClient.DefaultRequestHeaders.Add(current.Key, current.Value);
             }
         }
-        
+
+        private string GetCookieValue(HttpResponseMessage message,string cookieKey)
+        {
+            message.Headers.TryGetValues("Set-Cookie", out var setCookie);
+            var targetCookie=setCookie.FirstOrDefault(x=>x.Contains(cookieKey));
+            if (string.IsNullOrEmpty(targetCookie)) return "";
+            var cookie=targetCookie.Split(';').First(x=>x.Contains(cookieKey));
+            var keyValue=cookie.Split('=');
+            var valueString = keyValue[1];
+            var cookieValue = HttpUtility.UrlDecode(valueString);
+            return cookieValue;
+        }
     }
 }
