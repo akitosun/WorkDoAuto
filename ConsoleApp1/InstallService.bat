@@ -1,6 +1,6 @@
 ﻿@echo off
 set batchFolder=%~dp0
-set serviceName=ConsoleApp1.exe
+set serviceName=WorkDoWinService.exe
 set servicePatch=%batchFolder%%serviceName%
 
 echo BatchFolder:%batchFolder%
