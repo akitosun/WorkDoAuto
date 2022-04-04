@@ -16,8 +16,7 @@ namespace WorkDoService
     public class MainService
     {
         private IScheduler _scheduler;
-        private readonly ILog _logger
-            = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        //private readonly ILog _logger = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private Timer _timer;
 
         //public MainService()
@@ -53,7 +52,8 @@ namespace WorkDoService
             // create trigger (Clock in)
             ITrigger inTrigger = TriggerBuilder.Create()
                 .WithIdentity("ClockInTrigger", "MainGroup")
-                .WithCronSchedule("0/5 * * * * ? *")
+                .WithCronSchedule(clockInCron)
+                //.WithCronSchedule("0/5 * * * * ? *")
                 .StartAt(DateTime.UtcNow.AddHours(08))
                 .WithPriority(1)
                 .Build();
