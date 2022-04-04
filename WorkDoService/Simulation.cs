@@ -81,32 +81,17 @@ namespace WorkDoService
         {
             try
             {
-
-                var apiHelper=new ApiHelper();
+                
                 HttpWebRequest req = (HttpWebRequest)WebRequest.Create(punchURL);
                 req.Method = "POST";
                 req.Host = "www.workdo.co";
-                //req.Connection = "keep-alive";
                 req.AllowAutoRedirect = false;//服務端重定向。一般設置false
                 req.ContentType = "application/json;charset=UTF-8";
                 req.Accept = "application/json, text/plain, */*";
                 req.UserAgent =
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36";
-                //req.Headers.Add("Accept", "application/json, text/plain, */*");
-                req.Headers.Add("sec-ch-ua", "\" Not A; Brand\";v=\"99\", \"Chromium\";v=\"100\", \"Google Chrome\";v=\"100\"");
-                req.Headers.Add("sec-ch-ua-mobile", "?0");
-                req.Headers.Add("userLocale", "zh_TW");
-                req.Headers.Add("app_version_code", "wd_aweb_6.5.5");
                 req.Headers.Add("tenant_id", "aa6pd97f");
                 req.Headers.Add("timezone", "GMT+0800");
-                req.Headers.Add("sec-ch-ua-platform", "Windows");
-                req.Headers.Add("Origin", "https://www.workdo.co");
-                req.Headers.Add("Sec-Fetch-Site", "same-origin");
-                req.Headers.Add("Sec-Fetch-Mode", "cors");
-                req.Headers.Add("Sec-Fetch-Dest", "empty");
-                req.Referer =
-                    "https://www.workdo.co/ccnaweb/canvas.jsp?tenantId=aa6pd97f&svrVersionNo=wd_aweb_6.5.5&teamNameUsed=UserDispName&maxFileSize=20&brandName=WorkDo&isFromChina=false&baiduMapToken=sXFfhVn8bmQYohgAuFg0y9YGKq6AiROz&selfUid=aajiqi65ug&bigGroupThreshold=4000";
-                //req.Headers.Add("Referer", "https://www.workdo.co/ccnaweb/canvas.jsp?tenantId=aa6pd97f&svrVersionNo=wd_aweb_6.5.5&teamNameUsed=UserDispName&maxFileSize=20&brandName=WorkDo&isFromChina=false&baiduMapToken=sXFfhVn8bmQYohgAuFg0y9YGKq6AiROz&selfUid=aajiqi65ug&bigGroupThreshold=4000");
                 req.Headers.Add("Accept-Encoding", "gzip, deflate, br");
                 req.Headers.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
                 CookieContainer cookiecontainer = new CookieContainer();
@@ -126,6 +111,7 @@ namespace WorkDoService
                 postDataStream.Write(postBytes, 0, postBytes.Length);
                 postDataStream.Close();
                 HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
+
             }
             catch (Exception e)
             {

@@ -1,4 +1,5 @@
 ﻿using System;
+using Topshelf;
 using WorkDoService;
 
 namespace ConsoleApp1
@@ -7,13 +8,21 @@ namespace ConsoleApp1
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello, World!");
-            //var service = new WorkDoService.Service();
-            //service.PunchIn();
-            var s = new Simulation();
-            s.LoginSimulation();
-            s.PunchOut();
-            Console.WriteLine("Done!");
+            HostFactory.Run(x =>
+            {
+                x.Service<MainService>(s =>
+                {
+                    s.ConstructUsing(name => new MainService());
+                    s.WhenStarted(ms => ms.Start());
+                    s.WhenStopped(ms => ms.Stop());
+                });
+
+                x.SetServiceName("WorkDoAutoPunchService");
+                x.SetDisplayName("WorkDoAutoPunchService");
+                x.SetDescription("WorkDo自動打卡程式");
+                x.RunAsLocalSystem();
+                x.StartAutomatically();
+            });
 
         }
     }
