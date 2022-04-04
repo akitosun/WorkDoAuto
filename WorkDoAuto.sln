@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utility", "Utility\Utility.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UtilityTests", "UtilityTests\UtilityTests.csproj", "{45DB3047-465C-46DB-8FAB-1F53DE352061}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{A41EC701-4440-4513-B391-F190E5AEC6DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkDoWinService", "ConsoleApp1\WorkDoWinService.csproj", "{A41EC701-4440-4513-B391-F190E5AEC6DF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkDoService", "WorkDoService\WorkDoService.csproj", "{3FA3EB08-A651-4BFE-9228-0224C5BCD1A8}"
 EndProject

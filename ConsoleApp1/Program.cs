@@ -1,8 +1,7 @@
-﻿using System;
-using Topshelf;
+﻿using Topshelf;
 using WorkDoService;
 
-namespace ConsoleApp1
+namespace WorkDoWinService
 {
     internal class Program
     {
