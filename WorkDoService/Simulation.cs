@@ -16,7 +16,7 @@ using WorkDoService.Models;
 
 namespace WorkDoService
 {
-    public class Simulation
+    public class Simulation: ISimulation
     {
         private static Logger _logger = LogManager.GetCurrentClassLogger();
         /// <summary>
@@ -36,6 +36,11 @@ namespace WorkDoService
         private string loginURL = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
 
         private string punchURL = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
+
+        public bool IsNotLogin()
+        {
+            return string.IsNullOrEmpty(_cookie);
+        }
         public void LoginSimulation()
         {
             string url = loginURL;
@@ -77,7 +82,7 @@ namespace WorkDoService
             Punch("ClockOut");
         }
 
-        public void Punch(string punchType)
+        private void Punch(string punchType)
         {
             try
             {

@@ -84,7 +84,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MainJob.cs" />
+    <Compile Include="ClockOutJob.cs" />
+    <Compile Include="ClockInJob.cs" />
+    <Compile Include="ISimulation.cs" />
     <Compile Include="Models\LoginData.cs" />
     <Compile Include="Models\LoginResponse.cs" />
     <Compile Include="Models\PunchData.cs" />

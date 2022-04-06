@@ -22,7 +22,10 @@ namespace WorkDoWinService
                 x.RunAsLocalSystem();
                 x.StartAutomatically();
             });
-
+            //底下為測試用Code
+            //var service = new Simulation();
+            //service.LoginSimulation();
+            //service.PunchIn();
         }
     }
 }
