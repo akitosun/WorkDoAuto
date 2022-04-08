@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkDoService", "WorkDoServ
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkDoWinService", "ConsoleApp1\WorkDoWinService.csproj", "{A41EC701-4440-4513-B391-F190E5AEC6DF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkDoServiceIntegrationTests", "WorkDoServiceIntegrationTests\WorkDoServiceIntegrationTests.csproj", "{3459320C-A8F6-45D7-BEB2-BE4C241A212F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{A41EC701-4440-4513-B391-F190E5AEC6DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A41EC701-4440-4513-B391-F190E5AEC6DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A41EC701-4440-4513-B391-F190E5AEC6DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3459320C-A8F6-45D7-BEB2-BE4C241A212F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3459320C-A8F6-45D7-BEB2-BE4C241A212F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3459320C-A8F6-45D7-BEB2-BE4C241A212F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3459320C-A8F6-45D7-BEB2-BE4C241A212F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
