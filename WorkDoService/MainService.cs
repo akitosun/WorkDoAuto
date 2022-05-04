@@ -15,55 +15,69 @@ namespace WorkDoService
 {
     public class MainService
     {
-        private IScheduler _scheduler;
+        private IScheduler _clockIn_scheduler_Daily;
+
         public MainService()
         {
-            var clockin = ConfigHelper.GetInstance().GetAppSettingValue("ClockIn").Split(':');
-            var clockout = ConfigHelper.GetInstance().GetAppSettingValue("ClockOut").Split(':');
-            var clockInCron = $"0 {clockin[1]} {clockin[0]} ? * 1,2,3,4,5 ";
-            var clockOutCron = $"0 {clockout[1]} {clockout[0]} ? * 1,2,3,4,5 ";
-            // create Clock in job
-            IJobDetail jobIn = JobBuilder.Create<ClockInJob>()
-                .WithIdentity("ClockInJob", "MainGroup")
-                .Build();
-            // create trigger (Clock in)
-            ITrigger inTrigger = TriggerBuilder.Create()
-                .WithIdentity("ClockInTrigger", "MainGroup")
-                .WithCronSchedule(clockInCron)
-                .StartAt(DateTime.Now)
-                .WithPriority(1)
-                .Build();
-            // create Clock out job
-            IJobDetail jobOut = JobBuilder.Create<ClockOutJob>()
-                .WithIdentity("ClockOutJob", "MainGroup")
-                .Build();
-            // create trigger (Clock out)
-            ITrigger outTrigger = TriggerBuilder.Create()
-                .WithIdentity("ClockOutTrigger", "MainGroup")
-                .WithCronSchedule(clockOutCron)
-                //.WithCronSchedule("0/2 * * * * ? *")//測試用，每2秒執行一次
-                .StartAt(DateTime.Now)
-                .WithPriority(1)
-                .Build();
+            var _clockIn_timeSplit = ConfigHelper.GetInstance().GetAppSettingValue("ClockIn").Split(':');
 
-            // schedule job + trigger
-            _scheduler = StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult();
-            _scheduler.ScheduleJob(jobIn, inTrigger);
-            _scheduler.ScheduleJob(jobOut, outTrigger);
+            var _workday = ConfigHelper.GetInstance().GetAppSettingValue("WorkDay");
+
+            var _currentTime__Taiwan = DateTime.UtcNow.AddHours(8);
+
+            DateTime _clockIn_time_today = _currentTime__Taiwan.Date + TimeSpan.Parse(ConfigHelper.GetInstance().GetAppSettingValue("ClockIn"));
+
+
+
+            var _clockIn_Cron = $"0 {_clockIn_timeSplit[1]} {_clockIn_timeSplit[0]} ? * " + _workday + " ";
+
+            IJobDetail _clockIn_Job = JobBuilder.Create<ClockInJob>()
+                                               .WithIdentity("clockIn_Job", "RegularGroup")
+                                               .Build();
+
+
+            ITrigger _clockIn_Trigger = TriggerBuilder.Create()
+                                                     .WithIdentity("clockIn_Trigger", "RegularGroup")
+                                                     .WithCronSchedule(_clockIn_Cron, x => x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Taipei Standard Time")))
+                                                     .StartAt(DateTime.Now)
+                                                     .WithPriority(1)
+                                                     .Build();
+
+            ITrigger _clockIn_Trigger_Now = TriggerBuilder.Create()
+                                                .WithIdentity("clockIn_Trigger_Once", "OnceGroup")
+                                                .WithSimpleSchedule(x => x
+                                                .WithIntervalInSeconds(1)
+                                                .WithRepeatCount(0))
+                                                .WithPriority(1)
+                                                .Build();
+
+            if (_workday.Contains(((int)_currentTime__Taiwan.DayOfWeek).ToString()) && DateTime.Compare(_currentTime__Taiwan, _clockIn_time_today) == 1)     // 檢查 當前時間 超過 config file打卡時間 且 是否為工作日
+            {
+                IScheduler _clockIn_scheduler_Once = StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult();    // One time schedule
+                _clockIn_scheduler_Once.ScheduleJob(_clockIn_Job, _clockIn_Trigger_Now);
+                _clockIn_scheduler_Once.Start();
+            }
+
+
+            //// schedule job + trigger
+            _clockIn_scheduler_Daily = StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult();    // Daily schedule
+            _clockIn_scheduler_Daily.ScheduleJob(_clockIn_Job, _clockIn_Trigger);
+
         }
 
         public void Start()
         {
-            _scheduler.Start();
+            _clockIn_scheduler_Daily.Start();
             Console.WriteLine("排程啟動");
         }
 
         public void Stop()
         {
-            _scheduler.Shutdown();
+
+            _clockIn_scheduler_Daily.Shutdown();
             Console.WriteLine("排程停止");
         }
 
     }
-    
+
 }
