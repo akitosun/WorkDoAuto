@@ -87,9 +87,12 @@
     <Compile Include="ClockOutJob.cs" />
     <Compile Include="ClockInJob.cs" />
     <Compile Include="ISimulation.cs" />
+    <Compile Include="Models\Enum_clocktype.cs" />
+    <Compile Include="Models\HolidayData.cs" />
     <Compile Include="Models\LoginData.cs" />
     <Compile Include="Models\LoginResponse.cs" />
     <Compile Include="Models\PunchData.cs" />
+    <Compile Include="Models\PunchHistory.cs" />
     <Compile Include="Models\PunchResponse.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Simulation.cs" />
