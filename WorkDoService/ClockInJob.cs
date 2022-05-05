@@ -44,7 +44,8 @@ namespace WorkDoService
                         msg += "You already punched in at ";
                     }
 
-                    Console.Out.WriteLineAsync(msg + DateTime.Parse(punchHistory.punchTime.Replace("+0800", "")));
+                    Console.Out.WriteLineAsync(
+                        $"{msg}{DateTime.Parse(punchHistory.punchTime.Replace("+0800", "")):yyyy/MM/dd HH:mm:ss}");
 
 
 

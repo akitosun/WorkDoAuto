@@ -68,14 +68,14 @@ namespace WorkDoService
         public void Start()
         {
             _clockIn_scheduler_Daily.Start();
-            Console.WriteLine("排程啟動");
+            Console.WriteLine("Service Start.");
         }
 
         public void Stop()
         {
 
             _clockIn_scheduler_Daily.Shutdown();
-            Console.WriteLine("排程停止");
+            Console.WriteLine("Service Stop.");
         }
 
     }

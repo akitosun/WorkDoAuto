@@ -18,7 +18,7 @@ namespace WorkDoWinService
 
                 x.SetServiceName("WorkDoAutoPunchService");
                 x.SetDisplayName("WorkDoAutoPunchService");
-                x.SetDescription("WorkDo自動打卡程式");
+                x.SetDescription("WorkDoAutoPunchService");
                 x.RunAsLocalSystem();
                 x.StartAutomatically();
             });
