@@ -43,6 +43,10 @@ namespace WorkDoService
                                                      .WithPriority(1)
                                                      .Build();
 
+            IJobDetail _clockIn_Job_Now = JobBuilder.Create<ClockInJob>()
+                                                    .WithIdentity("_clockIn_Job_Now", "OnceGroup")
+                                                    .Build();
+
             ITrigger _clockIn_Trigger_Now = TriggerBuilder.Create()
                                                 .WithIdentity("clockIn_Trigger_Once", "OnceGroup")
                                                 .WithSimpleSchedule(x => x
@@ -54,7 +58,7 @@ namespace WorkDoService
             if (_workday.Contains(((int)_currentTime__Taiwan.DayOfWeek).ToString()) && DateTime.Compare(_currentTime__Taiwan, _clockIn_time_today) == 1)     // 檢查 當前時間 超過 config file打卡時間 且 是否為工作日
             {
                 IScheduler _clockIn_scheduler_Once = StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult();    // One time schedule
-                _clockIn_scheduler_Once.ScheduleJob(_clockIn_Job, _clockIn_Trigger_Now);
+                _clockIn_scheduler_Once.ScheduleJob(_clockIn_Job_Now, _clockIn_Trigger_Now);
                 _clockIn_scheduler_Once.Start();
             }
 
