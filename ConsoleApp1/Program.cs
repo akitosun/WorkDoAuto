@@ -1,4 +1,6 @@
-﻿using Topshelf;
+﻿using System;
+using System.Text;
+using Topshelf;
 using WorkDoService;
 
 namespace WorkDoWinService
@@ -7,6 +9,7 @@ namespace WorkDoWinService
     {
         static void Main(string[] args)
         {
+            Console.OutputEncoding = Encoding.UTF8;
             HostFactory.Run(x =>
             {
                 x.Service<MainService>(s =>

@@ -37,11 +37,11 @@ namespace WorkDoService
             Console.WriteLine($"{DateTime.Now} CronExpression check......");
             if (_isCronExpressionValid)
             {
-                Console.WriteLine($"CronExpression is Valid");
+                Console.WriteLine($"CronExpression is valid.");
             }
             else
             {
-                Console.WriteLine($"CronExpression is NOT Valid");
+                Console.WriteLine($"CronExpression is NOT valid !! Please check your config file.");
                 Console.ReadKey();
             }
 
