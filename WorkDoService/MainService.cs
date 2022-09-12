@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -16,6 +17,7 @@ namespace WorkDoService
     public class MainService
     {
         private IScheduler _clockIn_scheduler_Daily;
+        private bool _isCronExpressionValid;
 
         public MainService()
         {
@@ -30,6 +32,18 @@ namespace WorkDoService
 
 
             var _clockIn_Cron = $"0 {_clockIn_timeSplit[1]} {_clockIn_timeSplit[0]} ? * " + _workday + " ";
+
+            _isCronExpressionValid = CronExpression.IsValidExpression(_clockIn_Cron);
+            Console.WriteLine($"{DateTime.Now} CronExpression check......");
+            if (_isCronExpressionValid)
+            {
+                Console.WriteLine($"CronExpression is Valid");
+            }
+            else
+            {
+                Console.WriteLine($"CronExpression is NOT Valid");
+                Console.ReadKey();
+            }
 
             IJobDetail _clockIn_Job = JobBuilder.Create<ClockInJob>()
                                                .WithIdentity("clockIn_Job", "RegularGroup")
@@ -54,10 +68,15 @@ namespace WorkDoService
                                                 .WithRepeatCount(0))
                                                 .WithPriority(1)
                                                 .Build();
+            var isWorkday =
+                _workday.Contains(((int) _currentTime__Taiwan.DayOfWeek + 1)
+                    .ToString()); // add 1 reason : quartz's Sunday=1 , .NET's Sunday=0 
 
-            if (_workday.Contains(((int)_currentTime__Taiwan.DayOfWeek).ToString()) && DateTime.Compare(_currentTime__Taiwan, _clockIn_time_today) == 1)     // 檢查 當前時間 超過 config file打卡時間 且 是否為工作日
+            if (isWorkday &&
+                DateTime.Compare(_currentTime__Taiwan, _clockIn_time_today) >= 1) // 檢查 當前時間 超過 config file打卡時間 且 是否為工作日
             {
-                IScheduler _clockIn_scheduler_Once = StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult();    // One time schedule
+                IScheduler _clockIn_scheduler_Once =
+                    StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult(); // One time schedule
                 _clockIn_scheduler_Once.ScheduleJob(_clockIn_Job_Now, _clockIn_Trigger_Now);
                 _clockIn_scheduler_Once.Start();
             }
@@ -71,6 +90,11 @@ namespace WorkDoService
 
         public void Start()
         {
+            if (!_isCronExpressionValid)
+            {
+                Stop();
+            }
+
             _clockIn_scheduler_Daily.Start();
             Console.WriteLine("Service Start.");
         }
