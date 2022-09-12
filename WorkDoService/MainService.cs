@@ -34,7 +34,6 @@ namespace WorkDoService
             var _clockIn_Cron = $"0 {_clockIn_timeSplit[1]} {_clockIn_timeSplit[0]} ? * " + _workday + " ";
 
             _isCronExpressionValid = CronExpression.IsValidExpression(_clockIn_Cron);
-            Console.WriteLine($"{DateTime.Now} CronExpression check......");
             if (_isCronExpressionValid)
             {
                 Console.WriteLine($"CronExpression is valid.");
