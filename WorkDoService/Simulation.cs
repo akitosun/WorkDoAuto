@@ -43,7 +43,7 @@ namespace WorkDoService
 
         private static string url_Login = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
         private static string url_Punch = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
-        private static string url_Calendar = "https://www.workdo.co/hrsaweb/api/aweb/HRS003W/execute003W3FromMenu";
+        private static string url_Calendar = "http://www.workdo.co/hrsraweb/api/aweb/HRS003W/execute003W3FromMenu";
         private static string url_PunchStatus = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/execute102M2FromMenu";
 
 
