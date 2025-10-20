@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -43,7 +43,6 @@ namespace WorkDoService
 
         private static string url_Login = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
         private static string url_Punch = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
-        private static string url_Calendar = "http://www.workdo.co/hrsraweb/api/aweb/HRS003W/execute003W3FromMenu";
         private static string url_PunchStatus = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/execute102M2FromMenu";
 
 
@@ -86,40 +85,25 @@ namespace WorkDoService
             response.Close();
         }
 
-        public Task<List<string>> QueryHoliday()
+        public async Task<List<string>> QueryHoliday()
         {
-            List<string> vacationlist = new List<string>();
+            var vacationlist = new List<string>();
 
             try
             {
+                var calendarUrl = ConfigHelper.GetInstance().GetAppSettingValue("HolidayCalendarUrl");
 
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url_Calendar);
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(calendarUrl);
                 request.Method = "GET";
-                request.Accept = "application/json, text/plain, */*";
-                //request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-                request.Headers.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
-                request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36";
-                request.Headers.Add("tenant_id", "aa6pd97f");
-                request.ContentLength = 0;
+                request.Accept = "text/calendar, */*";
 
-                CookieContainer cookiecontainer = new CookieContainer();
-                string[] cookies = _cookie.Split(';');
-
-                foreach (string cookie in cookies)
-                    cookiecontainer.SetCookies(new Uri("https://www.workdo.co"), cookie);
-
-                request.CookieContainer = cookiecontainer;
-
-
-                var response = (HttpWebResponse)request.GetResponse();
-                //Stream stream = new GZipStream(response.GetResponseStream(), CompressionMode.Decompress);
-                Stream stream = response.GetResponseStream();
-
-                StreamReader reader = new StreamReader(stream, Encoding.UTF8);
-                JObject jobject = JObject.Parse(reader.ReadToEnd());
-                vacationlist = jobject.Value<JArray>("futureCalendarList").Select(x => DateTime.Parse(x["eventDate"].ToString()).ToShortDateString()).ToList();
-                response.Close();
-
+                using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(false))
+                using (Stream stream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    var calendarContent = reader.ReadToEnd();
+                    vacationlist = ParseHolidayCalendar(calendarContent);
+                }
             }
             catch (Exception e)
             {
@@ -127,7 +111,7 @@ namespace WorkDoService
                 throw;
             }
 
-            return Task.FromResult(vacationlist);
+            return vacationlist;
         }
 
 
@@ -183,6 +167,112 @@ namespace WorkDoService
                 throw;
             }
             return Task.FromResult(punchHistory);
+        }
+
+        private static List<string> ParseHolidayCalendar(string calendarContent)
+        {
+            var holidays = new HashSet<DateTime>();
+
+            if (string.IsNullOrWhiteSpace(calendarContent))
+            {
+                return holidays.Select(date => date.ToShortDateString()).ToList();
+            }
+
+            calendarContent = calendarContent.Replace("\r\n ", string.Empty).Replace("\n ", string.Empty);
+
+            using (var reader = new StringReader(calendarContent))
+            {
+                string line;
+                DateTime? start = null;
+                DateTime? end = null;
+                bool startIsDateOnly = false;
+                bool endIsDateOnly = false;
+
+                while ((line = reader.ReadLine()) != null)
+                {
+                    line = line.Trim();
+
+                    if (line.StartsWith("BEGIN:VEVENT", StringComparison.OrdinalIgnoreCase))
+                    {
+                        start = null;
+                        end = null;
+                        startIsDateOnly = false;
+                        endIsDateOnly = false;
+                    }
+                    else if (line.StartsWith("DTSTART", StringComparison.OrdinalIgnoreCase))
+                    {
+                        start = TryParseCalendarDate(line, out startIsDateOnly);
+                    }
+                    else if (line.StartsWith("DTEND", StringComparison.OrdinalIgnoreCase))
+                    {
+                        end = TryParseCalendarDate(line, out endIsDateOnly);
+                    }
+                    else if (line.StartsWith("END:VEVENT", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!start.HasValue)
+                        {
+                            continue;
+                        }
+
+                        var startDate = start.Value.Date;
+                        var endDate = startDate;
+
+                        if (end.HasValue)
+                        {
+                            endDate = end.Value.Date;
+
+                            if (endIsDateOnly || (end.Value.TimeOfDay == TimeSpan.Zero && endDate > startDate))
+                            {
+                                endDate = endDate.AddDays(-1);
+                            }
+                        }
+
+                        if (endDate < startDate)
+                        {
+                            endDate = startDate;
+                        }
+
+                        for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                        {
+                            holidays.Add(date);
+                        }
+                    }
+                }
+            }
+
+            return holidays.OrderBy(date => date).Select(date => date.ToShortDateString()).ToList();
+        }
+
+        private static DateTime? TryParseCalendarDate(string line, out bool isDateOnly)
+        {
+            isDateOnly = line.IndexOf("VALUE=DATE", StringComparison.OrdinalIgnoreCase) >= 0;
+            var segments = line.Split(':');
+
+            if (segments.Length < 2)
+            {
+                return null;
+            }
+
+            var value = segments[segments.Length - 1].Trim();
+
+            if (isDateOnly)
+            {
+                if (DateTime.TryParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateValue))
+                {
+                    return dateValue;
+                }
+
+                return null;
+            }
+
+            string[] formats = { "yyyyMMdd'T'HHmmss'Z'", "yyyyMMdd'T'HHmmss", "yyyyMMdd" };
+
+            if (DateTime.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dateTimeValue))
+            {
+                return dateTimeValue;
+            }
+
+            return null;
         }
 
 
