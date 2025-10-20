@@ -102,7 +102,9 @@ namespace WorkDoService
                 using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
                 {
                     var calendarContent = reader.ReadToEnd();
-                    vacationlist = ParseHolidayCalendar(calendarContent);
+                    vacationlist = ParseHolidayCalendar(calendarContent)
+                        .Select(date => date.ToShortDateString())
+                        .ToList();
                 }
             }
             catch (Exception e)
@@ -169,13 +171,13 @@ namespace WorkDoService
             return Task.FromResult(punchHistory);
         }
 
-        private static List<string> ParseHolidayCalendar(string calendarContent)
+        private static List<DateTime> ParseHolidayCalendar(string calendarContent)
         {
             var holidays = new HashSet<DateTime>();
 
             if (string.IsNullOrWhiteSpace(calendarContent))
             {
-                return holidays.Select(date => date.ToShortDateString()).ToList();
+                return new List<DateTime>();
             }
 
             calendarContent = calendarContent.Replace("\r\n ", string.Empty).Replace("\n ", string.Empty);
@@ -187,6 +189,7 @@ namespace WorkDoService
                 DateTime? end = null;
                 bool startIsDateOnly = false;
                 bool endIsDateOnly = false;
+                bool skipEvent = false;
 
                 while ((line = reader.ReadLine()) != null)
                 {
@@ -198,6 +201,7 @@ namespace WorkDoService
                         end = null;
                         startIsDateOnly = false;
                         endIsDateOnly = false;
+                        skipEvent = false;
                     }
                     else if (line.StartsWith("DTSTART", StringComparison.OrdinalIgnoreCase))
                     {
@@ -207,8 +211,23 @@ namespace WorkDoService
                     {
                         end = TryParseCalendarDate(line, out endIsDateOnly);
                     }
+                    else if (line.StartsWith("SUMMARY", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var summaryValue = line.Split(new[] { ':' }, 2).LastOrDefault()?.Trim();
+
+                        if (!string.IsNullOrEmpty(summaryValue) &&
+                            summaryValue.IndexOf("Monthly Step-Up Challenge", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            skipEvent = true;
+                        }
+                    }
                     else if (line.StartsWith("END:VEVENT", StringComparison.OrdinalIgnoreCase))
                     {
+                        if (skipEvent)
+                        {
+                            continue;
+                        }
+
                         if (!start.HasValue)
                         {
                             continue;
@@ -240,7 +259,7 @@ namespace WorkDoService
                 }
             }
 
-            return holidays.OrderBy(date => date).Select(date => date.ToShortDateString()).ToList();
+            return holidays.OrderBy(date => date).ToList();
         }
 
         private static DateTime? TryParseCalendarDate(string line, out bool isDateOnly)
