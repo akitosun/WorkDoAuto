@@ -14,7 +14,7 @@ namespace WorkDoWinService
         private readonly ContextMenuStrip _trayMenu;
         private readonly ToolStripMenuItem _openMenuItem;
         private readonly ToolStripMenuItem _exitMenuItem;
-        private readonly Label _statusLabel;
+        private Label _statusLabel;
         private TextBox _gpsLocationTextBox;
         private TextBox _gpsPlaceTextBox;
         private TextBox _clockInTextBox;

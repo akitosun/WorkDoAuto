@@ -11,7 +11,6 @@ namespace WorkDoWinService
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Console.OutputEncoding = Encoding.UTF8;
 
             try
             {
