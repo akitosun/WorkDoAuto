@@ -75,6 +75,59 @@ namespace Utility.Helper
         }
 
         /// <summary>
+        /// 更新組態檔應用程式設定項目值
+        /// </summary>
+        /// <param name="key">應用程式設定項目鍵值</param>
+        /// <param name="value">應用程式設定項目值</param>
+        public void SetAppSettingValue(string key, string value)
+        {
+            if (String.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentException("Key cannot be null or whitespace.", nameof(key));
+            }
+
+            bool hasUpdated = false;
+            List<Configuration> configList = OpenApConfiguration();
+
+            if (configList != null && configList.Count > 0)
+            {
+                foreach (var config in configList)
+                {
+                    if (config == null || config.AppSettings?.Settings == null)
+                    {
+                        continue;
+                    }
+
+                    var settings = config.AppSettings.Settings;
+                    if (settings[key] != null)
+                    {
+                        settings[key].Value = value;
+                        config.Save(ConfigurationSaveMode.Modified);
+                        ConfigurationManager.RefreshSection("appSettings");
+                        hasUpdated = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasUpdated)
+            {
+                Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                if (config.AppSettings.Settings[key] != null)
+                {
+                    config.AppSettings.Settings[key].Value = value;
+                }
+                else
+                {
+                    config.AppSettings.Settings.Add(key, value);
+                }
+
+                config.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection("appSettings");
+            }
+        }
+
+        /// <summary>
         /// 讀取組態檔資料庫連線字串設定項目值
         /// </summary>
         /// <param name="key">資料庫連線字串設定項目鍵值</param>

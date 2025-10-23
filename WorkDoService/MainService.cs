@@ -41,7 +41,7 @@ namespace WorkDoService
             else
             {
                 Console.WriteLine($"CronExpression is NOT valid !! Please check your config file.");
-                Console.ReadKey();
+                throw new InvalidOperationException("CronExpression is NOT valid. Please check your config file.");
             }
 
             IJobDetail _clockIn_Job = JobBuilder.Create<ClockInJob>()
@@ -101,7 +101,11 @@ namespace WorkDoService
         public void Stop()
         {
 
-            _clockIn_scheduler_Daily.Shutdown();
+            if (_clockIn_scheduler_Daily != null)
+            {
+                _clockIn_scheduler_Daily.Shutdown();
+            }
+
             Console.WriteLine("Service Stop.");
         }
 

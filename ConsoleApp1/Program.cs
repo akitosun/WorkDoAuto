@@ -1,35 +1,26 @@
-﻿using System;
+using System;
 using System.Text;
-using Topshelf;
-using WorkDoService;
+using System.Windows.Forms;
 
 namespace WorkDoWinService
 {
-    internal class Program
+    internal static class Program
     {
-        static void Main(string[] args)
+        [STAThread]
+        private static void Main()
         {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
             Console.OutputEncoding = Encoding.UTF8;
-            HostFactory.Run(x =>
-            {
-                x.Service<MainService>(s =>
-                {
-                    s.ConstructUsing(name => new MainService());
-                    s.WhenStarted(ms => ms.Start());
-                    s.WhenStopped(ms => ms.Stop());
-                });
 
-                x.SetServiceName("WorkDoAutoPunchService");
-                x.SetDisplayName("WorkDoAutoPunchService");
-                x.SetDescription("WorkDoAutoPunchService");
-                x.RunAsLocalSystem();
-                x.StartAutomatically();
-            });
-            //底下為測試用Code
-            //DateTime Time_PunchIn = DateTime.Now.Date + TimeSpan.Parse(ConfigHelper.GetInstance().GetAppSettingValue("ClockIn"));
-            //var service = new Simulation();
-            //service.LoginSimulation();
-            //service.PunchOut();
+            try
+            {
+                Application.Run(new MainForm());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "WorkDoAutoPunchService", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
