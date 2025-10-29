@@ -40,6 +40,7 @@ namespace WorkDoService
         private static string url_Login = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
         private static string url_PunchStatus = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/execute102M2FromMenu";
         private static string url_MissingPunchQuery = "https://www.workdo.co/ccnraweb/api/aweb/CCN002W/queryFromQuery002W1";
+        private static string url_MissingPunchSave = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M4";
 
 
         HolidayData latest_holiday = new HolidayData();
@@ -169,7 +170,7 @@ namespace WorkDoService
 
         public Task<List<ClockPunchRecord>> QueryMissingPunchRecordsAsync()
         {
-            var records = new List<ClockPunchRecord>();
+            List<ClockPunchRecord> records = new List<ClockPunchRecord>();
 
             try
             {
@@ -186,10 +187,13 @@ namespace WorkDoService
                 request.Headers.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
 
                 CookieContainer cookiecontainer = new CookieContainer();
-                string[] cookies = _cookie.Split(';');
+                string[] cookies = string.IsNullOrEmpty(_cookie) ? Array.Empty<string>() : _cookie.Split(';');
                 foreach (string cookie in cookies)
                 {
-                    cookiecontainer.SetCookies(new Uri("https://www.workdo.co"), cookie);
+                    if (!string.IsNullOrWhiteSpace(cookie))
+                    {
+                        cookiecontainer.SetCookies(new Uri("https://www.workdo.co"), cookie.Trim());
+                    }
                 }
 
                 request.CookieContainer = cookiecontainer;
@@ -216,6 +220,15 @@ namespace WorkDoService
                     }
                 }
 
+                if (records != null && records.Count > 0)
+                {
+                    foreach (var record in records.Where(r =>
+                                 string.Equals(r?.result, "Missing", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        PunchMissingDate(record);
+                    }
+                }
+
                 response.Close();
             }
             catch (Exception e)
@@ -224,47 +237,22 @@ namespace WorkDoService
                 throw;
             }
 
-            return Task.FromResult(records);
+            return Task.FromResult(records ?? new List<ClockPunchRecord>());
         }
 
-        public async Task<bool> SupplementMissingPunchAsync(Enum_clocktype clockType)
+        public async Task<bool> SupplementMissingPunchAsync()
         {
             try
             {
                 List<ClockPunchRecord> records = await QueryMissingPunchRecordsAsync().ConfigureAwait(false);
 
-                if (records == null || records.Count == 0)
+                if (records == null)
                 {
                     return false;
                 }
 
-                string today = DateTime.UtcNow.AddHours(8).ToString("yyyy-MM-dd");
-                string targetType = clockType == Enum_clocktype.ClockIn ? "ClockIn" : "ClockOut";
-
-                var missingRecords = records.Where(record =>
-                        string.Equals(record.result, "Missing", StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(record.type, targetType, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(record.punchDay, today, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                if (missingRecords.Count == 0)
-                {
-                    return false;
-                }
-
-                foreach (var _ in missingRecords)
-                {
-                    if (clockType == Enum_clocktype.ClockIn)
-                    {
-                        PunchIn();
-                    }
-                    else
-                    {
-                        PunchOut();
-                    }
-                }
-
-                return true;
+                return records.Any(record =>
+                    string.Equals(record?.result, "Missing", StringComparison.OrdinalIgnoreCase));
             }
             catch (Exception e)
             {
@@ -396,6 +384,83 @@ namespace WorkDoService
             return null;
         }
 
+
+        private void PunchMissingDate(ClockPunchRecord record)
+        {
+            if (record == null)
+            {
+                return;
+            }
+
+            if (!string.Equals(record.result, "Missing", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            try
+            {
+                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url_MissingPunchSave);
+                req.Method = "POST";
+                req.Host = "www.workdo.co";
+                req.AllowAutoRedirect = false;
+                req.ContentType = "application/json;charset=UTF-8";
+                req.Accept = "application/json, text/plain, */*";
+                req.UserAgent =
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36";
+                req.Headers.Add("tenant_id", "aa6pd97f");
+                req.Headers.Add("timezone", "GMT+0800");
+                req.Headers.Add("Accept-Encoding", "gzip, deflate, br");
+                req.Headers.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
+
+                CookieContainer cookiecontainer = new CookieContainer();
+                string[] cookies = string.IsNullOrEmpty(_cookie) ? Array.Empty<string>() : _cookie.Split(';');
+                foreach (string cookie in cookies)
+                {
+                    if (!string.IsNullOrWhiteSpace(cookie))
+                    {
+                        cookiecontainer.SetCookies(new Uri("https://www.workdo.co"), cookie.Trim());
+                    }
+                }
+
+                req.CookieContainer = cookiecontainer;
+
+                var requestData = new
+                {
+                    reqOid = record.reqOid,
+                    punchDay = record.punchDay,
+                    reqPunchTime = string.IsNullOrWhiteSpace(record.reqPunchTime) ? record.punchTime : record.reqPunchTime,
+                    reqPlace = string.IsNullOrWhiteSpace(record.reqPlace) ? record.place : record.reqPlace,
+                    reqOidEnc = record.reqOidEnc,
+                    type = record.type,
+                    fileInfoList = record.fileInfoList ?? new List<object>(),
+                    reqWifiPoint = record.reqWifiPoint,
+                    reqWifiMac = record.reqWifiMac,
+                    reqGpsPlace = string.IsNullOrWhiteSpace(record.reqGpsPlace) ? record.place : record.reqGpsPlace,
+                    reqGpsLocation = record.reqGpsLocation,
+                    reqFaceDeviceName = record.reqFaceDeviceName,
+                    reqFaceDeviceOid = record.reqFaceDeviceOid
+                };
+
+                string postData = JsonConvert.SerializeObject(requestData);
+                byte[] postBytes = Encoding.UTF8.GetBytes(postData);
+                req.ContentLength = postBytes.Length;
+
+                using (Stream postDataStream = req.GetRequestStream())
+                {
+                    postDataStream.Write(postBytes, 0, postBytes.Length);
+                }
+
+                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                {
+                    resp.Close();
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.Debug(e);
+                throw;
+            }
+        }
 
         public void PunchIn()
         {
