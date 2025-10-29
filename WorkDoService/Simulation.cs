@@ -44,6 +44,7 @@ namespace WorkDoService
         private static string url_Login = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
         private static string url_Punch = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
         private static string url_PunchStatus = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/execute102M2FromMenu";
+        private static string url_MissingPunchQuery = "https://www.workdo.co/ccnraweb/api/aweb/CCN002W/queryFromQuery002W1";
 
 
         HolidayData latest_holiday = new HolidayData();
@@ -169,6 +170,108 @@ namespace WorkDoService
                 throw;
             }
             return Task.FromResult(punchHistory);
+        }
+
+        public Task<List<ClockPunchRecord>> QueryMissingPunchRecordsAsync()
+        {
+            var records = new List<ClockPunchRecord>();
+
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url_MissingPunchQuery);
+                request.Method = "POST";
+                request.Host = "www.workdo.co";
+                request.AllowAutoRedirect = false;
+                request.ContentType = "application/json;charset=UTF-8";
+                request.Accept = "application/json, text/plain, */*";
+                request.UserAgent =
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36";
+                request.Headers.Add("tenant_id", "aa6pd97f");
+                request.Headers.Add("timezone", "GMT+0800");
+                request.Headers.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
+
+                CookieContainer cookiecontainer = new CookieContainer();
+                string[] cookies = _cookie.Split(';');
+                foreach (string cookie in cookies)
+                {
+                    cookiecontainer.SetCookies(new Uri("https://www.workdo.co"), cookie);
+                }
+
+                request.CookieContainer = cookiecontainer;
+
+                var requestPayload = new { displayName = "ClockPunchReq" };
+                string postData = JsonConvert.SerializeObject(requestPayload);
+                byte[] postBytes = Encoding.UTF8.GetBytes(postData);
+                request.ContentLength = postBytes.Length;
+
+                using (Stream postDataStream = request.GetRequestStream())
+                {
+                    postDataStream.Write(postBytes, 0, postBytes.Length);
+                }
+
+                var response = (HttpWebResponse)request.GetResponse();
+                Stream stream = response.GetResponseStream();
+                using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    var responseJson = reader.ReadToEnd();
+                    var queryResponse = JsonConvert.DeserializeObject<ClockPunchQueryResponse>(responseJson);
+                    if (queryResponse?.list != null)
+                    {
+                        records = queryResponse.list;
+                    }
+                }
+
+                response.Close();
+            }
+            catch (Exception e)
+            {
+                _logger.Debug(e);
+                throw;
+            }
+
+            return Task.FromResult(records);
+        }
+
+        public async Task<bool> SupplementMissingPunchAsync(Enum_clocktype clockType)
+        {
+            try
+            {
+                List<ClockPunchRecord> records = await QueryMissingPunchRecordsAsync().ConfigureAwait(false);
+
+                if (records == null || records.Count == 0)
+                {
+                    return false;
+                }
+
+                string today = DateTime.UtcNow.AddHours(8).ToString("yyyy-MM-dd");
+                string targetType = clockType == Enum_clocktype.ClockIn ? "ClockIn" : "ClockOut";
+
+                bool hasMissing = records.Any(record =>
+                    string.Equals(record.result, "Missing", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(record.type, targetType, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(record.punchDay, today, StringComparison.OrdinalIgnoreCase));
+
+                if (!hasMissing)
+                {
+                    return false;
+                }
+
+                if (clockType == Enum_clocktype.ClockIn)
+                {
+                    PunchIn();
+                }
+                else
+                {
+                    PunchOut();
+                }
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                _logger.Debug(e);
+                throw;
+            }
         }
 
         private static List<DateTime> ParseHolidayCalendar(string calendarContent)

@@ -91,6 +91,7 @@
     <Compile Include="Models\HolidayData.cs" />
     <Compile Include="Models\LoginData.cs" />
     <Compile Include="Models\LoginResponse.cs" />
+    <Compile Include="Models\ClockPunchQueryResponse.cs" />
     <Compile Include="Models\PunchData.cs" />
     <Compile Include="Models\PunchHistory.cs" />
     <Compile Include="Models\PunchResponse.cs" />
