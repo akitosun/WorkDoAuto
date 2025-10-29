@@ -29,20 +29,15 @@ namespace WorkDoService
         /// Get Password from app.configuration
         /// </summary>
         private string _password = ConfigHelper.GetInstance().GetAppSettingValue("Pw");
-        private string workday = ConfigHelper.GetInstance().GetAppSettingValue("WorkDay");
 
         private string _cookie;
 
         /// <summary>
         /// loginURL
         /// </summary>
-        private string loginURL = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
 
-        private string punchURL = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
-
-
+        private static string punchURL = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
         private static string url_Login = "https://www.workdo.co/bdddweb/api/dweb/BDD771M/userLogin";
-        private static string url_Punch = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M3";
         private static string url_PunchStatus = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/execute102M2FromMenu";
         private static string url_MissingPunchQuery = "https://www.workdo.co/ccnraweb/api/aweb/CCN002W/queryFromQuery002W1";
 
