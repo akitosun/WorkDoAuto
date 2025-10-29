@@ -476,7 +476,7 @@ namespace WorkDoService
                     reqOid = record.reqOid,
                     punchDay = record.punchDay,
                     reqPunchTime = requestPunchTime,
-                    reqPlace = requestPlace,
+                    reqPlace = "OtherCity",
                     reqOidEnc = record.reqOidEnc,
                     type = record.type,
                     fileInfoList = record.fileInfoList ?? new List<object>(),
