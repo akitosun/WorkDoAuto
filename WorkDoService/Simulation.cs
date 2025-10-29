@@ -246,23 +246,27 @@ namespace WorkDoService
                 string today = DateTime.UtcNow.AddHours(8).ToString("yyyy-MM-dd");
                 string targetType = clockType == Enum_clocktype.ClockIn ? "ClockIn" : "ClockOut";
 
-                bool hasMissing = records.Any(record =>
-                    string.Equals(record.result, "Missing", StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(record.type, targetType, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(record.punchDay, today, StringComparison.OrdinalIgnoreCase));
+                var missingRecords = records.Where(record =>
+                        string.Equals(record.result, "Missing", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(record.type, targetType, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(record.punchDay, today, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
-                if (!hasMissing)
+                if (missingRecords.Count == 0)
                 {
                     return false;
                 }
 
-                if (clockType == Enum_clocktype.ClockIn)
+                foreach (var _ in missingRecords)
                 {
-                    PunchIn();
-                }
-                else
-                {
-                    PunchOut();
+                    if (clockType == Enum_clocktype.ClockIn)
+                    {
+                        PunchIn();
+                    }
+                    else
+                    {
+                        PunchOut();
+                    }
                 }
 
                 return true;
