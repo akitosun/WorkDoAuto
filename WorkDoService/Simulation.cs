@@ -41,6 +41,19 @@ namespace WorkDoService
         private static string url_PunchStatus = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/execute102M2FromMenu";
         private static string url_MissingPunchQuery = "https://www.workdo.co/ccnraweb/api/aweb/CCN002W/queryFromQuery002W1";
         private static string url_MissingPunchSave = "https://www.workdo.co/ccndweb/api/dweb/CCN102M/saveFromCreate102M4";
+        private const string BrandNameHeaderValue = "WorkDo";
+        private const string AppVersionCodeHeaderValue = "wd_aweb_7.6.20";
+        private const string UserLocaleHeaderValue = "zh_TW";
+        private const string OriginHeaderValue = "https://www.workdo.co";
+        private const string RefererHeaderValue = "https://www.workdo.co/ccnaweb/?ver=wd_aweb_7.6.20/";
+        private const string SecChUaValue = "\"Google Chrome\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"";
+        private const string SecChUaMobileValue = "?0";
+        private const string SecChUaPlatformValue = "\"Windows\"";
+        private const string SecFetchSiteValue = "same-origin";
+        private const string SecFetchModeValue = "cors";
+        private const string SecFetchDestValue = "empty";
+        private const string TimezoneHeaderValue = "GMT+0800";
+        private const string TimezoneOffsetValue = "+0800";
 
 
         HolidayData latest_holiday = new HolidayData();
@@ -408,9 +421,20 @@ namespace WorkDoService
                 req.UserAgent =
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36";
                 req.Headers.Add("tenant_id", "aa6pd97f");
-                req.Headers.Add("timezone", "GMT+0800");
+                req.Headers.Add("timezone", TimezoneHeaderValue);
                 req.Headers.Add("Accept-Encoding", "gzip, deflate, br");
                 req.Headers.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
+                req.Headers.Add("brandName", BrandNameHeaderValue);
+                req.Headers.Add("app_version_code", AppVersionCodeHeaderValue);
+                req.Headers.Add("userLocale", UserLocaleHeaderValue);
+                req.Headers.Add("Sec-Fetch-Site", SecFetchSiteValue);
+                req.Headers.Add("Sec-Fetch-Mode", SecFetchModeValue);
+                req.Headers.Add("Sec-Fetch-Dest", SecFetchDestValue);
+                req.Headers.Add("sec-ch-ua", SecChUaValue);
+                req.Headers.Add("sec-ch-ua-mobile", SecChUaMobileValue);
+                req.Headers.Add("sec-ch-ua-platform", SecChUaPlatformValue);
+                req.Headers.Add("Origin", OriginHeaderValue);
+                req.Referer = RefererHeaderValue;
 
                 CookieContainer cookiecontainer = new CookieContainer();
                 string[] cookies = string.IsNullOrEmpty(_cookie) ? Array.Empty<string>() : _cookie.Split(';');
@@ -424,19 +448,42 @@ namespace WorkDoService
 
                 req.CookieContainer = cookiecontainer;
 
+                var configHelper = ConfigHelper.GetInstance();
+                string configuredPlace = TryGetAppSettingValue(configHelper, "gpsPlace");
+                string configuredGpsLocation = TryGetAppSettingValue(configHelper, "gpsLocation");
+                string configuredTimeKey = string.Equals(record.type, "ClockOut", StringComparison.OrdinalIgnoreCase) ? "ClockOut" : "ClockIn";
+                string configuredTime = TryGetAppSettingValue(configHelper, configuredTimeKey);
+
+                string requestPunchTime = BuildConfiguredPunchDateTime(record.punchDay, configuredTime, TimezoneOffsetValue)
+                    ?? (!string.IsNullOrWhiteSpace(record.reqPunchTime)
+                        ? record.reqPunchTime
+                        : (!string.IsNullOrWhiteSpace(record.punchTime) ? record.punchTime : null));
+
+                string requestPlace = !string.IsNullOrWhiteSpace(configuredPlace)
+                    ? configuredPlace
+                    : (!string.IsNullOrWhiteSpace(record.reqPlace) ? record.reqPlace : record.place);
+
+                string requestGpsPlace = !string.IsNullOrWhiteSpace(configuredPlace)
+                    ? configuredPlace
+                    : (!string.IsNullOrWhiteSpace(record.reqGpsPlace) ? record.reqGpsPlace : record.place);
+
+                ClockPunchLocation requestGpsLocation = !string.IsNullOrWhiteSpace(configuredGpsLocation)
+                    ? new ClockPunchLocation { text = configuredGpsLocation }
+                    : record.reqGpsLocation;
+
                 var requestData = new
                 {
                     reqOid = record.reqOid,
                     punchDay = record.punchDay,
-                    reqPunchTime = string.IsNullOrWhiteSpace(record.reqPunchTime) ? record.punchTime : record.reqPunchTime,
-                    reqPlace = string.IsNullOrWhiteSpace(record.reqPlace) ? record.place : record.reqPlace,
+                    reqPunchTime = requestPunchTime,
+                    reqPlace = requestPlace,
                     reqOidEnc = record.reqOidEnc,
                     type = record.type,
                     fileInfoList = record.fileInfoList ?? new List<object>(),
                     reqWifiPoint = record.reqWifiPoint,
                     reqWifiMac = record.reqWifiMac,
-                    reqGpsPlace = string.IsNullOrWhiteSpace(record.reqGpsPlace) ? record.place : record.reqGpsPlace,
-                    reqGpsLocation = record.reqGpsLocation,
+                    reqGpsPlace = requestGpsPlace,
+                    reqGpsLocation = requestGpsLocation,
                     reqFaceDeviceName = record.reqFaceDeviceName,
                     reqFaceDeviceOid = record.reqFaceDeviceOid
                 };
@@ -460,6 +507,46 @@ namespace WorkDoService
                 _logger.Debug(e);
                 throw;
             }
+        }
+
+        private static string TryGetAppSettingValue(ConfigHelper configHelper, string key)
+        {
+            if (configHelper == null || string.IsNullOrWhiteSpace(key))
+            {
+                return null;
+            }
+
+            try
+            {
+                return configHelper.GetAppSettingValue(key);
+            }
+            catch (ApplicationException)
+            {
+                return null;
+            }
+        }
+
+        private static string BuildConfiguredPunchDateTime(string punchDay, string configuredTime, string timezoneOffset)
+        {
+            if (string.IsNullOrWhiteSpace(punchDay) || string.IsNullOrWhiteSpace(configuredTime))
+            {
+                return null;
+            }
+
+            if (!DateTime.TryParseExact(punchDay, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateValue))
+            {
+                return null;
+            }
+
+            if (!TimeSpan.TryParse(configuredTime, out var timeValue))
+            {
+                return null;
+            }
+
+            var combined = dateValue.Add(timeValue);
+            var offset = string.IsNullOrWhiteSpace(timezoneOffset) ? string.Empty : timezoneOffset.Trim();
+
+            return string.Format(CultureInfo.InvariantCulture, "{0:yyyy-MM-dd HH:mm:ss}{1}", combined, offset);
         }
 
         public void PunchIn()
