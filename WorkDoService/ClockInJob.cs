@@ -27,7 +27,7 @@ namespace WorkDoService
                 var _currentTime_Taiwan = DateTime.UtcNow.AddHours(8);
 
                 simulation.LoginSimulation();
-                await simulation.SupplementMissingPunchAsync(Enum_clocktype.ClockIn);
+                await simulation.SupplementMissingPunchAsync();
 
                 List<string> vacationlist = await simulation.QueryHoliday();
                 PunchHistory punchHistory = await simulation.Query_PunchHistory(Enum_clocktype.ClockIn);

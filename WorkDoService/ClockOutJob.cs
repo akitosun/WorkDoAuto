@@ -21,7 +21,7 @@ namespace WorkDoService
 
                 var simulation = new Simulation();
                 simulation.LoginSimulation();
-                await simulation.SupplementMissingPunchAsync(Enum_clocktype.ClockOut);
+                await simulation.SupplementMissingPunchAsync();
                 PunchHistory punchHistory = await simulation.Query_PunchHistory(Enum_clocktype.ClockOut);
 
                 if (String.IsNullOrEmpty(punchHistory.punchTime))      // 無打卡紀錄，執行打卡
