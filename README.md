@@ -1,7 +1,7 @@
 # WorkDoAuto
 WorkDo平台自動打卡程式
 # How to Use
-1. 下載壓縮檔 (https://github.com/akitosun/WorkDoAuto/blob/master/Publish.7z)，解壓縮
+1. [下載壓縮檔](https://github.com/akitosun/WorkDoAuto/blob/master/Publish.7z)並解壓縮
 2. 使用文字編輯器開啟WorkDoWinService.exe.config，搜尋appSettings節點，設定以下資訊
 - Email:WorkDo的帳號
 - Pw:密碼
