@@ -34,18 +34,16 @@ namespace WorkDoService
 
                 if (!vacationlist.Contains(_currentTime_Taiwan.ToShortDateString()))   // 判斷 當前時間 是否為國定假日
                 {
-                    if (String.IsNullOrEmpty(punchHistory.punchTime))      // 無打卡紀錄，執行打卡
+                    PunchResult result = await simulation.PunchWithValidationAsync(Enum_clocktype.ClockIn);
+                    punchHistory.punchTime = result.PunchTime;
+                    msg = result.WasPunched ? "Punch In Successfully at " : "You already punched in at ";
+
+                    if (result.WasPunched)
                     {
-                        simulation.PunchIn();
-                        punchHistory = await simulation.Query_PunchHistory(Enum_clocktype.ClockIn);
-                        msg += "Punch In Sucessfully at ";
-                    }
-                    else
-                    {
-                        msg += "You already punched in at ";
+                        PunchNotification.Notify(result);
                     }
 
-                    Console.Out.WriteLineAsync(
+                    await Console.Out.WriteLineAsync(
                         $"{msg}{DateTime.Parse(punchHistory.punchTime.Replace("+0800", "")):yyyy/MM/dd HH:mm:ss}");
 
 
@@ -53,8 +51,19 @@ namespace WorkDoService
                     // 取得今日預計打卡時間
                     DateTime _clockOut_time_today = _currentTime_Taiwan.Date + TimeSpan.Parse(ConfigHelper.GetInstance().GetAppSettingValue("ClockOut"));
 
-                    // 比較 今日上班打卡時間 + 9 hrs ，以及 config file 的打卡時間，取較晚者做為今日打卡下班時間。
-                    _clockOut_time_today = DateTime.Compare(DateTime.Parse(punchHistory.punchTime).AddHours(9).AddMinutes(1), _clockOut_time_today) == 1 ? DateTime.Parse(punchHistory.punchTime).AddHours(9).AddMinutes(1) : _clockOut_time_today;
+                    // 啟用彈性下班時，依實際上班比設定時間晚的分鐘數延後下班；提早上班不會提早下班。
+                    bool enableFlexibleClockOut = GetBooleanSetting("EnableFlexibleClockOut", true);
+                    if (enableFlexibleClockOut)
+                    {
+                        DateTime configuredClockIn = _currentTime_Taiwan.Date +
+                            TimeSpan.Parse(ConfigHelper.GetInstance().GetAppSettingValue("ClockIn"));
+                        DateTime actualClockIn = DateTime.Parse(punchHistory.punchTime.Replace("+0800", ""));
+                        TimeSpan delay = actualClockIn - configuredClockIn;
+                        if (delay > TimeSpan.Zero)
+                        {
+                            _clockOut_time_today = _clockOut_time_today.Add(delay);
+                        }
+                    }
 
 
                     var _clockOut_timeSplit = _clockOut_time_today.TimeOfDay.ToString().Split(':');
@@ -90,8 +99,8 @@ namespace WorkDoService
 
 
                     IScheduler _clockOut_scheduler = StdSchedulerFactory.GetDefaultScheduler().GetAwaiter().GetResult();
-                    _clockOut_scheduler.ScheduleJob(_clockOut_Job, _clockOut_Trigger);
-                    _clockOut_scheduler.Start();
+                    await _clockOut_scheduler.ScheduleJob(_clockOut_Job, _clockOut_Trigger);
+                    await _clockOut_scheduler.Start();
 
 
 
@@ -105,6 +114,21 @@ namespace WorkDoService
                 throw;
             }
 
+        }
+
+        private static bool GetBooleanSetting(string key, bool defaultValue)
+        {
+            try
+            {
+                bool parsedValue;
+                return bool.TryParse(ConfigHelper.GetInstance().GetAppSettingValue(key), out parsedValue)
+                    ? parsedValue
+                    : defaultValue;
+            }
+            catch (ApplicationException)
+            {
+                return defaultValue;
+            }
         }
     }
 }

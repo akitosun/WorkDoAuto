@@ -22,25 +22,20 @@ namespace WorkDoService
                 var simulation = new Simulation();
                 simulation.LoginSimulation();
                 await simulation.SupplementMissingPunchAsync();
-                PunchHistory punchHistory = await simulation.Query_PunchHistory(Enum_clocktype.ClockOut);
+                PunchResult result = await simulation.PunchWithValidationAsync(Enum_clocktype.ClockOut);
+                msg = result.WasPunched ? "Punch Out Successfully at " : "You already punched out at ";
 
-                if (String.IsNullOrEmpty(punchHistory.punchTime))      // 無打卡紀錄，執行打卡
+                if (result.WasPunched)
                 {
-                    simulation.PunchOut();
-                    punchHistory = await simulation.Query_PunchHistory(Enum_clocktype.ClockOut);
-                    msg += "Punch Out Sucessfully at ";
-                }
-                else
-                {
-                    msg += "You already punched out at ";
+                    PunchNotification.Notify(result);
                 }
 
-                Console.Out.WriteLineAsync(
-                    $"{msg}{DateTime.Parse(punchHistory.punchTime.Replace("+0800", "")):yyyy/MM/dd HH:mm:ss}");
+                await Console.Out.WriteLineAsync(
+                    $"{msg}{DateTime.Parse(result.PunchTime.Replace("+0800", "")):yyyy/MM/dd HH:mm:ss}");
             }
             catch (Exception e)
             {
-                Console.Out.WriteLineAsync(e.Message);
+                await Console.Out.WriteLineAsync(e.Message);
                 _logger.Debug(e);
                 throw;
             }

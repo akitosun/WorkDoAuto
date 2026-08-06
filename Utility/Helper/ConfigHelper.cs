@@ -11,6 +11,13 @@ namespace Utility.Helper
     /// </summary>
     public class ConfigHelper
     {
+        private static readonly HashSet<string> LocalSettingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Email", "Pw", "gpsLocation", "gpsPlace"
+        };
+
+        private static readonly object LocalSettingsLock = new object();
+
         private static readonly Lazy<ConfigHelper> _lazyUniqueConfigHelper =
             new Lazy<ConfigHelper>(() => new ConfigHelper());
 
@@ -37,7 +44,40 @@ namespace Utility.Helper
         /// <returns>應用程式設定項目值</returns>
         public string GetAppSettingValue(string key)
         {
-            string value = String.Empty;
+            if (LocalSettingKeys.Contains(key))
+            {
+                lock (LocalSettingsLock)
+                {
+                    Configuration localConfig = OpenLocalConfiguration();
+                    KeyValueConfigurationElement localSetting = localConfig.AppSettings.Settings[key];
+                    if (localSetting != null)
+                    {
+                        return localSetting.Value;
+                    }
+
+                    string legacyValue;
+                    if (TryGetApplicationSetting(key, out legacyValue))
+                    {
+                        SetLocalSetting(localConfig, key, legacyValue);
+                        return legacyValue;
+                    }
+
+                    return String.Empty;
+                }
+            }
+
+            string applicationValue;
+            if (TryGetApplicationSetting(key, out applicationValue))
+            {
+                return applicationValue;
+            }
+
+            throw new ApplicationException(String.Format("Can't read config file appsetting key {0}!", key));
+        }
+
+        private bool TryGetApplicationSetting(string key, out string value)
+        {
+            value = String.Empty;
             bool hasKey = false;
 
             List<Configuration> configList = OpenApConfiguration();
@@ -66,12 +106,7 @@ namespace Utility.Helper
                 }
             }
 
-            if (!hasKey)
-            {
-                throw new ApplicationException(String.Format("Can't read config file appsetting key {0}!", key));
-            }
-
-            return value;
+            return hasKey;
         }
 
         /// <summary>
@@ -84,6 +119,15 @@ namespace Utility.Helper
             if (String.IsNullOrWhiteSpace(key))
             {
                 throw new ArgumentException("Key cannot be null or whitespace.", nameof(key));
+            }
+
+            if (LocalSettingKeys.Contains(key))
+            {
+                lock (LocalSettingsLock)
+                {
+                    SetLocalSetting(OpenLocalConfiguration(), key, value ?? String.Empty);
+                }
+                return;
             }
 
             bool hasUpdated = false;
@@ -125,6 +169,35 @@ namespace Utility.Helper
                 config.Save(ConfigurationSaveMode.Modified);
                 ConfigurationManager.RefreshSection("appSettings");
             }
+        }
+
+        private static Configuration OpenLocalConfiguration()
+        {
+            string settingsDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "WorkDoAuto");
+            Directory.CreateDirectory(settingsDirectory);
+
+            var configMap = new ExeConfigurationFileMap
+            {
+                ExeConfigFilename = Path.Combine(settingsDirectory, "settings.config")
+            };
+
+            return ConfigurationManager.OpenMappedExeConfiguration(configMap, ConfigurationUserLevel.None);
+        }
+
+        private static void SetLocalSetting(Configuration config, string key, string value)
+        {
+            if (config.AppSettings.Settings[key] == null)
+            {
+                config.AppSettings.Settings.Add(key, value);
+            }
+            else
+            {
+                config.AppSettings.Settings[key].Value = value;
+            }
+
+            config.Save(ConfigurationSaveMode.Modified);
         }
 
         /// <summary>

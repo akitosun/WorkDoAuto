@@ -5,6 +5,7 @@ using System.IO;
 using System.Windows.Forms;
 using Utility.Helper;
 using WorkDoService;
+using WorkDoService.Models;
 
 namespace WorkDoWinService
 {
@@ -15,10 +16,15 @@ namespace WorkDoWinService
         private readonly ToolStripMenuItem _openMenuItem;
         private readonly ToolStripMenuItem _exitMenuItem;
         private Label _statusLabel;
+        private TextBox _emailTextBox;
+        private TextBox _passwordTextBox;
         private TextBox _gpsLocationTextBox;
         private TextBox _gpsPlaceTextBox;
         private TextBox _clockInTextBox;
         private TextBox _clockOutTextBox;
+        private CheckBox _enableFlexibleClockOutCheckBox;
+        private Button _manualClockInButton;
+        private Button _manualClockOutButton;
         private Button _saveButton;
         private bool _allowClose;
         private MainService _service;
@@ -28,7 +34,7 @@ namespace WorkDoWinService
             AutoScaleMode = AutoScaleMode.Font;
             StartPosition = FormStartPosition.CenterScreen;
             Text = "WorkDo 自動打卡";
-            MinimumSize = new Size(500, 320);
+            MinimumSize = new Size(500, 460);
 
             Icon appIcon = LoadApplicationIcon();
             Icon = appIcon;
@@ -51,6 +57,7 @@ namespace WorkDoWinService
 
             BuildLayout();
             LoadSettings();
+            PunchNotification.PunchCompleted += OnAutomaticPunchCompleted;
             StartService();
 
             Resize += OnResize;
@@ -61,6 +68,7 @@ namespace WorkDoWinService
         {
             if (disposing)
             {
+                PunchNotification.PunchCompleted -= OnAutomaticPunchCompleted;
                 StopService();
                 if (_trayIcon != null)
                 {
@@ -79,7 +87,7 @@ namespace WorkDoWinService
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 6,
+                RowCount = 10,
                 Padding = new Padding(16),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink
@@ -92,6 +100,9 @@ namespace WorkDoWinService
             _gpsPlaceTextBox = CreateTextBox();
             _clockInTextBox = CreateTextBox();
             _clockOutTextBox = CreateTextBox();
+            _emailTextBox = CreateTextBox();
+            _passwordTextBox = CreateTextBox();
+            _passwordTextBox.UseSystemPasswordChar = true;
 
             layout.Controls.Add(CreateLabel("GPS 座標"), 0, 0);
             layout.Controls.Add(_gpsLocationTextBox, 1, 0);
@@ -105,6 +116,36 @@ namespace WorkDoWinService
             layout.Controls.Add(CreateLabel("下班時間"), 0, 3);
             layout.Controls.Add(_clockOutTextBox, 1, 3);
 
+            _enableFlexibleClockOutCheckBox = new CheckBox
+            {
+                Text = "啟用彈性下班時間",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left
+            };
+            layout.Controls.Add(_enableFlexibleClockOutCheckBox, 1, 4);
+
+            var manualPunchPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+
+            _manualClockInButton = new Button { Text = "手動打上班卡", AutoSize = true };
+            _manualClockOutButton = new Button { Text = "手動打下班卡", AutoSize = true };
+            _manualClockInButton.Click += async (_, __) => await ManualPunchAsync(Enum_clocktype.ClockIn);
+            _manualClockOutButton.Click += async (_, __) => await ManualPunchAsync(Enum_clocktype.ClockOut);
+            manualPunchPanel.Controls.Add(_manualClockInButton);
+            manualPunchPanel.Controls.Add(_manualClockOutButton);
+            layout.Controls.Add(CreateLabel("手動打卡"), 0, 5);
+            layout.Controls.Add(manualPunchPanel, 1, 5);
+
+            layout.Controls.Add(CreateLabel("Email"), 0, 8);
+            layout.Controls.Add(_emailTextBox, 1, 8);
+            layout.Controls.Add(CreateLabel("密碼"), 0, 9);
+            layout.Controls.Add(_passwordTextBox, 1, 9);
+
             _saveButton = new Button
             {
                 Text = "儲存設定",
@@ -114,7 +155,7 @@ namespace WorkDoWinService
             };
             _saveButton.Click += (_, __) => SaveSettings();
 
-            layout.Controls.Add(_saveButton, 1, 4);
+            layout.Controls.Add(_saveButton, 1, 6);
 
             _statusLabel = new Label
             {
@@ -122,7 +163,7 @@ namespace WorkDoWinService
                 ForeColor = Color.DimGray,
                 Margin = new Padding(3, 12, 3, 0)
             };
-            layout.Controls.Add(_statusLabel, 0, 5);
+            layout.Controls.Add(_statusLabel, 0, 7);
             layout.SetColumnSpan(_statusLabel, 2);
 
             Controls.Add(layout);
@@ -173,10 +214,13 @@ namespace WorkDoWinService
             try
             {
                 var helper = ConfigHelper.GetInstance();
+                _emailTextBox.Text = helper.GetAppSettingValue("Email");
+                _passwordTextBox.Text = helper.GetAppSettingValue("Pw");
                 _gpsLocationTextBox.Text = helper.GetAppSettingValue("gpsLocation");
                 _gpsPlaceTextBox.Text = helper.GetAppSettingValue("gpsPlace");
                 _clockInTextBox.Text = helper.GetAppSettingValue("ClockIn");
                 _clockOutTextBox.Text = helper.GetAppSettingValue("ClockOut");
+                _enableFlexibleClockOutCheckBox.Checked = GetBooleanSetting(helper, "EnableFlexibleClockOut", true);
                 UpdateStatus("設定已載入。");
             }
             catch (ConfigurationErrorsException ex)
@@ -194,10 +238,13 @@ namespace WorkDoWinService
             try
             {
                 var helper = ConfigHelper.GetInstance();
+                helper.SetAppSettingValue("Email", _emailTextBox.Text.Trim());
+                helper.SetAppSettingValue("Pw", _passwordTextBox.Text);
                 helper.SetAppSettingValue("gpsLocation", _gpsLocationTextBox.Text.Trim());
                 helper.SetAppSettingValue("gpsPlace", _gpsPlaceTextBox.Text.Trim());
                 helper.SetAppSettingValue("ClockIn", _clockInTextBox.Text.Trim());
                 helper.SetAppSettingValue("ClockOut", _clockOutTextBox.Text.Trim());
+                helper.SetAppSettingValue("EnableFlexibleClockOut", _enableFlexibleClockOutCheckBox.Checked.ToString().ToLowerInvariant());
 
                 RestartService();
                 UpdateStatus("設定已儲存並重新啟動排程服務。");
@@ -235,6 +282,80 @@ namespace WorkDoWinService
         {
             StopService();
             StartService();
+        }
+
+        private async System.Threading.Tasks.Task ManualPunchAsync(Enum_clocktype clockType)
+        {
+            _manualClockInButton.Enabled = false;
+            _manualClockOutButton.Enabled = false;
+
+            try
+            {
+                var simulation = new Simulation();
+                await System.Threading.Tasks.Task.Run(() => simulation.LoginSimulation());
+                var result = await simulation.PunchWithValidationAsync(clockType);
+                string typeText = clockType == Enum_clocktype.ClockIn ? "上班卡" : "下班卡";
+                string message = result.WasPunched
+                    ? $"{typeText}打卡成功：{FormatPunchTime(result.PunchTime)}"
+                    : $"今天已經打過{typeText}：{FormatPunchTime(result.PunchTime)}";
+
+                UpdateStatus(message);
+                _trayIcon.ShowBalloonTip(3000, Text, message,
+                    result.WasPunched ? ToolTipIcon.Info : ToolTipIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus("手動打卡失敗：" + ex.Message, true);
+                MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _manualClockInButton.Enabled = true;
+                _manualClockOutButton.Enabled = true;
+            }
+        }
+
+        private void OnAutomaticPunchCompleted(object sender, WorkDoService.Models.PunchCompletedEventArgs e)
+        {
+            Action showToast = () =>
+            {
+                string typeText = e.Result.ClockType == Enum_clocktype.ClockIn ? "上班卡" : "下班卡";
+                string message = $"自動{typeText}成功：{FormatPunchTime(e.Result.PunchTime)}";
+                UpdateStatus(message);
+                _trayIcon.ShowBalloonTip(3000, Text, message, ToolTipIcon.Info);
+            };
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(showToast);
+            }
+            else
+            {
+                showToast();
+            }
+        }
+
+        private static string FormatPunchTime(string punchTime)
+        {
+            DateTime parsedTime;
+            return DateTime.TryParse((punchTime ?? string.Empty).Replace("+0800", string.Empty), out parsedTime)
+                ? parsedTime.ToString("yyyy/MM/dd HH:mm:ss")
+                : punchTime;
+        }
+
+        private static bool GetBooleanSetting(ConfigHelper helper, string key, bool defaultValue)
+        {
+            try
+            {
+                bool parsedValue;
+                return bool.TryParse(helper.GetAppSettingValue(key), out parsedValue)
+                    ? parsedValue
+                    : defaultValue;
+            }
+            catch (ApplicationException)
+            {
+                return defaultValue;
+            }
         }
 
         private void StopService()

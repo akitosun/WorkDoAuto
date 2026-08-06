@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,6 +21,7 @@ namespace WorkDoService
     public class Simulation : ISimulation
     {
         private static Logger _logger = LogManager.GetCurrentClassLogger();
+        private static readonly SemaphoreSlim PunchLock = new SemaphoreSlim(1, 1);
         /// <summary>
         /// Get Email from app.configuration
         /// </summary>
@@ -556,6 +558,43 @@ namespace WorkDoService
         public void PunchOut()
         {
             Punch("ClockOut");
+        }
+
+        public async Task<PunchResult> PunchWithValidationAsync(Enum_clocktype clockType)
+        {
+            await PunchLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                PunchHistory existingPunch = await Query_PunchHistory(clockType).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(existingPunch.punchTime))
+                {
+                    return new PunchResult
+                    {
+                        ClockType = clockType,
+                        WasPunched = false,
+                        PunchTime = existingPunch.punchTime
+                    };
+                }
+
+                Punch(clockType == Enum_clocktype.ClockIn ? "ClockIn" : "ClockOut");
+
+                PunchHistory verifiedPunch = await Query_PunchHistory(clockType).ConfigureAwait(false);
+                if (verifiedPunch == null || string.IsNullOrWhiteSpace(verifiedPunch.punchTime))
+                {
+                    throw new InvalidOperationException("WorkDo did not return a punch record after punching.");
+                }
+
+                return new PunchResult
+                {
+                    ClockType = clockType,
+                    WasPunched = true,
+                    PunchTime = verifiedPunch.punchTime
+                };
+            }
+            finally
+            {
+                PunchLock.Release();
+            }
         }
 
         private void Punch(string punchType)
