@@ -1,7 +1,9 @@
 using System;
 using System.Configuration;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Utility.Helper;
 using WorkDoService;
@@ -20,7 +22,8 @@ namespace WorkDoWinService
         private Label _loginStatusLabel;
         private TextBox _emailTextBox;
         private TextBox _passwordTextBox;
-        private TextBox _gpsLocationTextBox;
+        private TextBox _gpsXTextBox;
+        private TextBox _gpsYTextBox;
         private TextBox _gpsPlaceTextBox;
         private TextBox _clockInTextBox;
         private TextBox _clockOutTextBox;
@@ -100,7 +103,8 @@ namespace WorkDoWinService
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 
-            _gpsLocationTextBox = CreateTextBox();
+            _gpsXTextBox = CreateTextBox();
+            _gpsYTextBox = CreateTextBox();
             _gpsPlaceTextBox = CreateTextBox();
             _clockInTextBox = CreateTextBox();
             _clockOutTextBox = CreateTextBox();
@@ -108,8 +112,25 @@ namespace WorkDoWinService
             _passwordTextBox = CreateTextBox();
             _passwordTextBox.UseSystemPasswordChar = true;
 
+            var gpsCoordinatePanel = new TableLayoutPanel
+            {
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                ColumnCount = 4,
+                RowCount = 1,
+                Margin = Padding.Empty
+            };
+            gpsCoordinatePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            gpsCoordinatePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            gpsCoordinatePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            gpsCoordinatePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
+            gpsCoordinatePanel.Controls.Add(CreateLabel("X"), 0, 0);
+            gpsCoordinatePanel.Controls.Add(_gpsXTextBox, 1, 0);
+            gpsCoordinatePanel.Controls.Add(CreateLabel("Y"), 2, 0);
+            gpsCoordinatePanel.Controls.Add(_gpsYTextBox, 3, 0);
+
             layout.Controls.Add(CreateLabel("GPS 座標"), 0, 0);
-            layout.Controls.Add(_gpsLocationTextBox, 1, 0);
+            layout.Controls.Add(gpsCoordinatePanel, 1, 0);
 
             layout.Controls.Add(CreateLabel("地址"), 0, 1);
             layout.Controls.Add(_gpsPlaceTextBox, 1, 1);
@@ -244,7 +265,7 @@ namespace WorkDoWinService
                 var helper = ConfigHelper.GetInstance();
                 _emailTextBox.Text = helper.GetAppSettingValue("Email");
                 _passwordTextBox.Text = helper.GetAppSettingValue("Pw");
-                _gpsLocationTextBox.Text = helper.GetAppSettingValue("gpsLocation");
+                LoadGpsCoordinates(helper.GetAppSettingValue("gpsLocation"));
                 _gpsPlaceTextBox.Text = helper.GetAppSettingValue("gpsPlace");
                 _clockInTextBox.Text = helper.GetAppSettingValue("ClockIn");
                 _clockOutTextBox.Text = helper.GetAppSettingValue("ClockOut");
@@ -268,7 +289,8 @@ namespace WorkDoWinService
                 var helper = ConfigHelper.GetInstance();
                 helper.SetAppSettingValue("Email", _emailTextBox.Text.Trim());
                 helper.SetAppSettingValue("Pw", _passwordTextBox.Text);
-                helper.SetAppSettingValue("gpsLocation", _gpsLocationTextBox.Text.Trim());
+                string gpsLocation = BuildGpsLocation();
+                helper.SetAppSettingValue("gpsLocation", gpsLocation);
                 helper.SetAppSettingValue("gpsPlace", _gpsPlaceTextBox.Text.Trim());
                 helper.SetAppSettingValue("ClockIn", _clockInTextBox.Text.Trim());
                 helper.SetAppSettingValue("ClockOut", _clockOutTextBox.Text.Trim());
@@ -288,6 +310,47 @@ namespace WorkDoWinService
                 UpdateStatus("儲存設定發生錯誤：" + ex.Message, true);
                 MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void LoadGpsCoordinates(string gpsLocation)
+        {
+            if (string.IsNullOrWhiteSpace(gpsLocation))
+            {
+                return;
+            }
+
+            Match pointMatch = Regex.Match(
+                gpsLocation,
+                @"^\s*POINT\s*\(\s*(?<x>[^\s,()]+)\s+(?<y>[^\s,()]+)\s*\)\s*$",
+                RegexOptions.IgnoreCase);
+            if (!pointMatch.Success)
+            {
+                pointMatch = Regex.Match(
+                    gpsLocation,
+                    @"^\s*(?<x>[^,]+?)\s*,\s*(?<y>[^,]+?)\s*$");
+            }
+
+            if (pointMatch.Success)
+            {
+                _gpsXTextBox.Text = pointMatch.Groups["x"].Value.Trim();
+                _gpsYTextBox.Text = pointMatch.Groups["y"].Value.Trim();
+            }
+        }
+
+        private string BuildGpsLocation()
+        {
+            string x = _gpsXTextBox.Text.Trim();
+            string y = _gpsYTextBox.Text.Trim();
+            double coordinate;
+            if (string.IsNullOrWhiteSpace(x)
+                || string.IsNullOrWhiteSpace(y)
+                || !double.TryParse(x, NumberStyles.Float, CultureInfo.InvariantCulture, out coordinate)
+                || !double.TryParse(y, NumberStyles.Float, CultureInfo.InvariantCulture, out coordinate))
+            {
+                throw new ConfigurationErrorsException("GPS X、Y 座標必須填寫有效數字，小數請使用小數點。");
+            }
+
+            return $"POINT ({x} {y})";
         }
 
         private async System.Threading.Tasks.Task LoginAsync(bool saveCredentials)
