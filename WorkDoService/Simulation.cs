@@ -69,8 +69,6 @@ namespace WorkDoService
 
         public void LoginSimulation()
         {
-
-
             var loginData = new LoginData();
             loginData.clientType = "Web";
             loginData.clientModel = "Chrome 100.0.4896.127";
@@ -88,13 +86,65 @@ namespace WorkDoService
             request.ContentType = "application/json;charset=UTF-8";
             byte[] postBytes = Encoding.UTF8.GetBytes(PostData);
             request.ContentLength = postBytes.Length;
-            Stream postDataStream = request.GetRequestStream();
-            postDataStream.Write(postBytes, 0, postBytes.Length);
-            postDataStream.Close();
+            try
+            {
+                using (Stream postDataStream = request.GetRequestStream())
+                {
+                    postDataStream.Write(postBytes, 0, postBytes.Length);
+                }
 
-            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-            _cookie = response.Headers.Get("Set-Cookie"); //獲取登錄後的cookie值。
-            response.Close();
+                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                {
+                    _cookie = response.Headers.Get("Set-Cookie"); //獲取登錄後的cookie值。
+                    string responseBody = ReadResponseBody(response);
+                    if (string.IsNullOrWhiteSpace(_cookie))
+                    {
+                        throw new InvalidOperationException(GetLoginErrorMessage(responseBody));
+                    }
+                }
+            }
+            catch (WebException ex)
+            {
+                string responseBody = ex.Response == null ? null : ReadResponseBody(ex.Response);
+                throw new InvalidOperationException(GetLoginErrorMessage(responseBody, ex.Message), ex);
+            }
+        }
+
+        private static string ReadResponseBody(WebResponse response)
+        {
+            using (Stream responseStream = response.GetResponseStream())
+            using (var reader = new StreamReader(responseStream ?? Stream.Null, Encoding.UTF8))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        private static string GetLoginErrorMessage(string responseBody, string fallback = null)
+        {
+            if (!string.IsNullOrWhiteSpace(responseBody))
+            {
+                try
+                {
+                    var json = JToken.Parse(responseBody);
+                    string[] messageKeys = { "message", "errorMessage", "errorMsg", "msg", "description", "detail" };
+                    foreach (string key in messageKeys)
+                    {
+                        var value = json.SelectTokens("$.." + key).FirstOrDefault(token => token.Type == JTokenType.String);
+                        if (value != null && !string.IsNullOrWhiteSpace(value.ToString()))
+                        {
+                            return value.ToString();
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // 非 JSON 的 API 回應仍應顯示給使用者。
+                }
+
+                return responseBody.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(fallback) ? "登入失敗，WorkDo 未回傳登入憑證。" : fallback;
         }
 
         public async Task<List<string>> QueryHoliday()

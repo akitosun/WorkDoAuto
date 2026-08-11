@@ -16,6 +16,8 @@ namespace WorkDoWinService
         private readonly ToolStripMenuItem _openMenuItem;
         private readonly ToolStripMenuItem _exitMenuItem;
         private Label _statusLabel;
+        private Label _loginStatusIconLabel;
+        private Label _loginStatusLabel;
         private TextBox _emailTextBox;
         private TextBox _passwordTextBox;
         private TextBox _gpsLocationTextBox;
@@ -26,6 +28,7 @@ namespace WorkDoWinService
         private Button _manualClockInButton;
         private Button _manualClockOutButton;
         private Button _saveButton;
+        private Button _loginButton;
         private bool _allowClose;
         private MainService _service;
 
@@ -59,6 +62,7 @@ namespace WorkDoWinService
             LoadSettings();
             PunchNotification.PunchCompleted += OnAutomaticPunchCompleted;
             StartService();
+            Shown += async (_, __) => await LoginAsync(false);
 
             Resize += OnResize;
             FormClosing += OnFormClosing;
@@ -87,7 +91,7 @@ namespace WorkDoWinService
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 10,
+                RowCount = 12,
                 Padding = new Padding(16),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink
@@ -145,6 +149,30 @@ namespace WorkDoWinService
             layout.Controls.Add(_emailTextBox, 1, 8);
             layout.Controls.Add(CreateLabel("密碼"), 0, 9);
             layout.Controls.Add(_passwordTextBox, 1, 9);
+
+            var loginStatusPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            _loginStatusIconLabel = new Label { Text = "●", AutoSize = true, ForeColor = Color.DimGray };
+            _loginStatusLabel = new Label { Text = "尚未登入", AutoSize = true, ForeColor = Color.DimGray };
+            loginStatusPanel.Controls.Add(_loginStatusIconLabel);
+            loginStatusPanel.Controls.Add(_loginStatusLabel);
+            layout.Controls.Add(CreateLabel("登入狀態"), 0, 10);
+            layout.Controls.Add(loginStatusPanel, 1, 10);
+
+            _loginButton = new Button
+            {
+                Text = "登入",
+                AutoSize = true,
+                Anchor = AnchorStyles.Right,
+                Padding = new Padding(10, 4, 10, 4)
+            };
+            _loginButton.Click += async (_, __) => await LoginAsync(true);
+            layout.Controls.Add(_loginButton, 1, 11);
 
             _saveButton = new Button
             {
@@ -260,6 +288,55 @@ namespace WorkDoWinService
                 UpdateStatus("儲存設定發生錯誤：" + ex.Message, true);
                 MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private async System.Threading.Tasks.Task LoginAsync(bool saveCredentials)
+        {
+            if (string.IsNullOrWhiteSpace(_emailTextBox.Text) || string.IsNullOrEmpty(_passwordTextBox.Text))
+            {
+                SetLoginStatus("請輸入 Email 與密碼。", false);
+                return;
+            }
+
+            _loginButton.Enabled = false;
+            _emailTextBox.Enabled = false;
+            _passwordTextBox.Enabled = false;
+            SetLoginStatus("登入中…", null);
+
+            try
+            {
+                if (saveCredentials)
+                {
+                    var helper = ConfigHelper.GetInstance();
+                    helper.SetAppSettingValue("Email", _emailTextBox.Text.Trim());
+                    helper.SetAppSettingValue("Pw", _passwordTextBox.Text);
+                    RestartService();
+                }
+
+                var simulation = new Simulation();
+                await System.Threading.Tasks.Task.Run(() => simulation.LoginSimulation());
+                SetLoginStatus("登入成功", true);
+            }
+            catch (Exception ex)
+            {
+                string message = "登入失敗：" + ex.Message;
+                SetLoginStatus(message, false);
+                MessageBox.Show(message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _loginButton.Enabled = true;
+                _emailTextBox.Enabled = true;
+                _passwordTextBox.Enabled = true;
+            }
+        }
+
+        private void SetLoginStatus(string message, bool? succeeded)
+        {
+            Color color = succeeded == true ? Color.ForestGreen : succeeded == false ? Color.Firebrick : Color.DarkOrange;
+            _loginStatusIconLabel.ForeColor = color;
+            _loginStatusLabel.ForeColor = color;
+            _loginStatusLabel.Text = message;
         }
 
         private void StartService()
