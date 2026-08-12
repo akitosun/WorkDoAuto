@@ -27,9 +27,19 @@ if not defined MSBUILD_EXE (
     exit /b 1
 )
 
-echo Building WorkDoAuto [%CONFIGURATION%]...
+echo Restoring NuGet packages...
 echo MSBuild: %MSBUILD_EXE%
 
+"%MSBUILD_EXE%" "%SOLUTION%" /t:Restore /m /p:RestorePackagesConfig=true /v:minimal
+if errorlevel 1 (
+    echo.
+    echo PACKAGE RESTORE FAILED.
+    echo Check your network connection and NuGet package sources, then try again.
+    exit /b 1
+)
+
+echo.
+echo Building WorkDoAuto [%CONFIGURATION%]...
 "%MSBUILD_EXE%" "%SOLUTION%" /t:Build /m /p:Configuration="%CONFIGURATION%" /v:minimal
 if errorlevel 1 (
     echo.
