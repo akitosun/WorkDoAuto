@@ -4,6 +4,7 @@ setlocal
 set "SOLUTION=%~dp0WorkDoAuto.sln"
 set "CONFIGURATION=%~1"
 if not defined CONFIGURATION set "CONFIGURATION=Release"
+set "OUTPUT_ROOT=%~dp0artifacts\%CONFIGURATION%"
 
 set "MSBUILD_EXE="
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -39,5 +40,5 @@ if errorlevel 1 (
 
 echo.
 echo BUILD SUCCEEDED.
-echo Output: %~dp0ConsoleApp1\bin\%CONFIGURATION%
+echo Output: %OUTPUT_ROOT%
 exit /b 0

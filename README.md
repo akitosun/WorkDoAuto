@@ -37,7 +37,7 @@ build.bat Release
 Release 執行檔位於：
 
 ```text
-ConsoleApp1\bin\Release\WorkDoWinService.exe
+artifacts\Release\WorkDoWinService\WorkDoWinService.exe
 ```
 
 ## 使用方式
