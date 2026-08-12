@@ -20,6 +20,8 @@ namespace WorkDoWinService
         private Label _statusLabel;
         private Label _loginStatusIconLabel;
         private Label _loginStatusLabel;
+        private Label _clockInStatusLabel;
+        private Label _clockOutStatusLabel;
         private TextBox _emailTextBox;
         private TextBox _passwordTextBox;
         private TextBox _gpsXTextBox;
@@ -40,7 +42,7 @@ namespace WorkDoWinService
             AutoScaleMode = AutoScaleMode.Font;
             StartPosition = FormStartPosition.CenterScreen;
             Text = "WorkDo 自動打卡";
-            MinimumSize = new Size(500, 460);
+            MinimumSize = new Size(500, 520);
 
             Icon appIcon = LoadApplicationIcon();
             Icon = appIcon;
@@ -94,7 +96,7 @@ namespace WorkDoWinService
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 12,
+                RowCount = 13,
                 Padding = new Padding(16),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink
@@ -163,13 +165,27 @@ namespace WorkDoWinService
             _manualClockOutButton.Click += async (_, __) => await ManualPunchAsync(Enum_clocktype.ClockOut);
             manualPunchPanel.Controls.Add(_manualClockInButton);
             manualPunchPanel.Controls.Add(_manualClockOutButton);
+
+            var punchStatusPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false
+            };
+            _clockInStatusLabel = CreatePunchStatusLabel("上班：尚未打卡");
+            _clockOutStatusLabel = CreatePunchStatusLabel("下班：尚未打卡");
+            punchStatusPanel.Controls.Add(_clockInStatusLabel);
+            punchStatusPanel.Controls.Add(_clockOutStatusLabel);
             layout.Controls.Add(CreateLabel("手動打卡"), 0, 5);
             layout.Controls.Add(manualPunchPanel, 1, 5);
+            layout.Controls.Add(CreateLabel("今日打卡狀態"), 0, 6);
+            layout.Controls.Add(punchStatusPanel, 1, 6);
 
-            layout.Controls.Add(CreateLabel("Email"), 0, 8);
-            layout.Controls.Add(_emailTextBox, 1, 8);
-            layout.Controls.Add(CreateLabel("密碼"), 0, 9);
-            layout.Controls.Add(_passwordTextBox, 1, 9);
+            layout.Controls.Add(CreateLabel("Email"), 0, 9);
+            layout.Controls.Add(_emailTextBox, 1, 9);
+            layout.Controls.Add(CreateLabel("密碼"), 0, 10);
+            layout.Controls.Add(_passwordTextBox, 1, 10);
 
             var loginStatusPanel = new FlowLayoutPanel
             {
@@ -182,8 +198,8 @@ namespace WorkDoWinService
             _loginStatusLabel = new Label { Text = "尚未登入", AutoSize = true, ForeColor = Color.DimGray };
             loginStatusPanel.Controls.Add(_loginStatusIconLabel);
             loginStatusPanel.Controls.Add(_loginStatusLabel);
-            layout.Controls.Add(CreateLabel("登入狀態"), 0, 10);
-            layout.Controls.Add(loginStatusPanel, 1, 10);
+            layout.Controls.Add(CreateLabel("登入狀態"), 0, 11);
+            layout.Controls.Add(loginStatusPanel, 1, 11);
 
             _loginButton = new Button
             {
@@ -193,7 +209,7 @@ namespace WorkDoWinService
                 Padding = new Padding(10, 4, 10, 4)
             };
             _loginButton.Click += async (_, __) => await LoginAsync(true);
-            layout.Controls.Add(_loginButton, 1, 11);
+            layout.Controls.Add(_loginButton, 1, 12);
 
             _saveButton = new Button
             {
@@ -204,7 +220,7 @@ namespace WorkDoWinService
             };
             _saveButton.Click += (_, __) => SaveSettings();
 
-            layout.Controls.Add(_saveButton, 1, 6);
+            layout.Controls.Add(_saveButton, 1, 7);
 
             _statusLabel = new Label
             {
@@ -212,7 +228,7 @@ namespace WorkDoWinService
                 ForeColor = Color.DimGray,
                 Margin = new Padding(3, 12, 3, 0)
             };
-            layout.Controls.Add(_statusLabel, 0, 7);
+            layout.Controls.Add(_statusLabel, 0, 8);
             layout.SetColumnSpan(_statusLabel, 2);
 
             Controls.Add(layout);
@@ -312,6 +328,17 @@ namespace WorkDoWinService
             }
         }
 
+        private static Label CreatePunchStatusLabel(string text)
+        {
+            return new Label
+            {
+                Text = text,
+                AutoSize = true,
+                ForeColor = Color.DimGray,
+                Margin = new Padding(3, 2, 3, 2)
+            };
+        }
+
         private void LoadGpsCoordinates(string gpsLocation)
         {
             if (string.IsNullOrWhiteSpace(gpsLocation))
@@ -379,6 +406,7 @@ namespace WorkDoWinService
                 var simulation = new Simulation();
                 await System.Threading.Tasks.Task.Run(() => simulation.LoginSimulation());
                 SetLoginStatus("登入成功", true);
+                await RefreshPunchStatusAsync(simulation, true);
             }
             catch (Exception ex)
             {
@@ -434,6 +462,7 @@ namespace WorkDoWinService
                 var simulation = new Simulation();
                 await System.Threading.Tasks.Task.Run(() => simulation.LoginSimulation());
                 var result = await simulation.PunchWithValidationAsync(clockType);
+                UpdatePunchStatus(result);
                 string typeText = clockType == Enum_clocktype.ClockIn ? "上班卡" : "下班卡";
                 string message = result.WasPunched
                     ? $"{typeText}打卡成功：{FormatPunchTime(result.PunchTime)}"
@@ -460,9 +489,13 @@ namespace WorkDoWinService
             Action showToast = () =>
             {
                 string typeText = e.Result.ClockType == Enum_clocktype.ClockIn ? "上班卡" : "下班卡";
-                string message = $"自動{typeText}成功：{FormatPunchTime(e.Result.PunchTime)}";
+                UpdatePunchStatus(e.Result);
+                string message = e.Result.WasPunched
+                    ? $"自動{typeText}成功：{FormatPunchTime(e.Result.PunchTime)}"
+                    : $"今天已經打過{typeText}：{FormatPunchTime(e.Result.PunchTime)}";
                 UpdateStatus(message);
-                _trayIcon.ShowBalloonTip(3000, Text, message, ToolTipIcon.Info);
+                _trayIcon.ShowBalloonTip(3000, Text, message,
+                    e.Result.WasPunched ? ToolTipIcon.Info : ToolTipIcon.Warning);
             };
 
             if (InvokeRequired)
@@ -473,6 +506,39 @@ namespace WorkDoWinService
             {
                 showToast();
             }
+        }
+
+        private async System.Threading.Tasks.Task RefreshPunchStatusAsync(Simulation simulation, bool showToast)
+        {
+            PunchHistory clockIn = await simulation.Query_PunchHistory(Enum_clocktype.ClockIn);
+            PunchHistory clockOut = await simulation.Query_PunchHistory(Enum_clocktype.ClockOut);
+            string clockInTime = clockIn == null ? null : clockIn.punchTime;
+            string clockOutTime = clockOut == null ? null : clockOut.punchTime;
+
+            UpdatePunchStatus(Enum_clocktype.ClockIn, clockInTime);
+            UpdatePunchStatus(Enum_clocktype.ClockOut, clockOutTime);
+
+            if (showToast && (!string.IsNullOrWhiteSpace(clockInTime) || !string.IsNullOrWhiteSpace(clockOutTime)))
+            {
+                string message = !string.IsNullOrWhiteSpace(clockOutTime)
+                    ? $"今天已打過上班卡（{FormatPunchTime(clockInTime)}）與下班卡（{FormatPunchTime(clockOutTime)}）"
+                    : $"今天已打過上班卡：{FormatPunchTime(clockInTime)}";
+                _trayIcon.ShowBalloonTip(3000, Text, message, ToolTipIcon.Warning);
+            }
+        }
+
+        private void UpdatePunchStatus(PunchResult result)
+        {
+            UpdatePunchStatus(result.ClockType, result.PunchTime);
+        }
+
+        private void UpdatePunchStatus(Enum_clocktype clockType, string punchTime)
+        {
+            Label label = clockType == Enum_clocktype.ClockIn ? _clockInStatusLabel : _clockOutStatusLabel;
+            string typeText = clockType == Enum_clocktype.ClockIn ? "上班" : "下班";
+            bool hasPunched = !string.IsNullOrWhiteSpace(punchTime);
+            label.Text = hasPunched ? $"{typeText}：已打卡（{FormatPunchTime(punchTime)}）" : $"{typeText}：尚未打卡";
+            label.ForeColor = hasPunched ? Color.ForestGreen : Color.DimGray;
         }
 
         private static string FormatPunchTime(string punchTime)

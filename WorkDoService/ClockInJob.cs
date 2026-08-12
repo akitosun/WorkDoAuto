@@ -38,10 +38,7 @@ namespace WorkDoService
                     punchHistory.punchTime = result.PunchTime;
                     msg = result.WasPunched ? "Punch In Successfully at " : "You already punched in at ";
 
-                    if (result.WasPunched)
-                    {
-                        PunchNotification.Notify(result);
-                    }
+                    PunchNotification.Notify(result);
 
                     await Console.Out.WriteLineAsync(
                         $"{msg}{DateTime.Parse(punchHistory.punchTime.Replace("+0800", "")):yyyy/MM/dd HH:mm:ss}");

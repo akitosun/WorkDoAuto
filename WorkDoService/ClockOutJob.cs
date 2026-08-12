@@ -25,10 +25,7 @@ namespace WorkDoService
                 PunchResult result = await simulation.PunchWithValidationAsync(Enum_clocktype.ClockOut);
                 msg = result.WasPunched ? "Punch Out Successfully at " : "You already punched out at ";
 
-                if (result.WasPunched)
-                {
-                    PunchNotification.Notify(result);
-                }
+                PunchNotification.Notify(result);
 
                 await Console.Out.WriteLineAsync(
                     $"{msg}{DateTime.Parse(result.PunchTime.Replace("+0800", "")):yyyy/MM/dd HH:mm:ss}");
