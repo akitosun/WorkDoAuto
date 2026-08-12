@@ -13,12 +13,12 @@ namespace Utility.Helper.Tests
     public class ConfigHelperTests
     {
         [TestMethod()]
-        [DataRow("Email","xxx@gmail.com")]
+        [DataRow("PunchIn", "")]
         public void GetAppSettingValue_ShouldBePass(string key,string expectedValue)
         {
             
             var actual = ConfigHelper.GetInstance().GetAppSettingValue(key);
-            actual.Should().BeEquivalentTo(expectedValue);
+            actual.Should().Be(expectedValue);
         }
     }
 }

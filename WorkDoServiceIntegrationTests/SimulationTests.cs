@@ -1,32 +1,78 @@
-﻿using System.Net;
+using System;
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using WorkDoService;
 
 namespace WorkDoServiceIntegrationTests
 {
-    [TestClass()]
+    [TestClass]
     public class SimulationTests
     {
-        /// <summary>
-        /// 使用這測試前請先將『測試專案』的app.config裡面的登入資訊設定正確
-        /// </summary>
-        [TestMethod()]
+        [TestMethod]
+        [TestCategory("Integration")]
         public void LoginShouldBePass()
         {
-            var simulation = new Simulation();
+            RequireLiveIntegrationTests();
+            var simulation = CreateSimulation(
+                RequireEnvironmentVariable("WORKDO_TEST_EMAIL"),
+                RequireEnvironmentVariable("WORKDO_TEST_PASSWORD"));
+
             simulation.LoginSimulation();
+
             simulation.IsNotLogin().Should().BeFalse();
         }
-        /// <summary>
-        /// 使用這測試前請先將『測試專案』的app.config裡面的登入資訊設定成錯誤的，才能驗證到登入錯誤的例外
-        /// </summary>
-        [ExpectedException(typeof(WebException))]
-        [TestMethod()]
+
+        [TestMethod]
+        [TestCategory("Integration")]
         public void LoginShouldBeFail()
         {
+            RequireLiveIntegrationTests();
+            var simulation = CreateSimulation(
+                "invalid-workdo-user-" + Guid.NewGuid().ToString("N") + "@example.invalid",
+                Guid.NewGuid().ToString("N"));
+
+            Action login = () => simulation.LoginSimulation();
+
+            login.Should().Throw<InvalidOperationException>();
+        }
+
+        private static void RequireLiveIntegrationTests()
+        {
+            if (!string.Equals(
+                Environment.GetEnvironmentVariable("WORKDO_RUN_INTEGRATION_TESTS"),
+                "true",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.Inconclusive(
+                    "Set WORKDO_RUN_INTEGRATION_TESTS=true to run tests against the live WorkDo API.");
+            }
+        }
+
+        private static string RequireEnvironmentVariable(string name)
+        {
+            string value = Environment.GetEnvironmentVariable(name);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                Assert.Inconclusive(name + " must be set for live WorkDo integration tests.");
+            }
+
+            return value;
+        }
+
+        private static Simulation CreateSimulation(string email, string password)
+        {
             var simulation = new Simulation();
-            simulation.LoginSimulation();
+            SetPrivateField(simulation, "_email", email);
+            SetPrivateField(simulation, "_password", password);
+            return simulation;
+        }
+
+        private static void SetPrivateField(Simulation simulation, string fieldName, string value)
+        {
+            FieldInfo field = typeof(Simulation).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, "Simulation field was not found: " + fieldName);
+            field.SetValue(simulation, value);
         }
     }
 }
